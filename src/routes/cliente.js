@@ -171,6 +171,18 @@ router.get('/api/cliente/grupo-automacao', (req, res) => {
   const ga = require('../grupo-automacao');
   res.json({ controle: clientes.config(req.cliente.id).wa_grupo_controle || '', ajuda: ga.AJUDA });
 });
+// ── Repostar ofertas de outros grupos (src/repostar-grupos.js) ──
+router.get('/api/cliente/repostar', (req, res) => res.json(require('../repostar-grupos').painel(req.cliente.id)));
+router.get('/api/cliente/repostar/grupos', async (req, res) => {
+  const proprio = require('../whatsapp-proprio');
+  try {
+    const todos = await proprio.carregarGrupos(proprio.donoDe(req.cliente.id), { todos: true });
+    res.json({ grupos: todos.map(g => ({ id: g.id, nome: g.nome, membros: g.membros, meu: g.meu })) });
+  } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
+});
+router.post('/api/cliente/repostar', async (req, res) => {
+  try { res.json(await require('../repostar-grupos').salvar(req.cliente.id, req.body || {})); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
+});
 router.get('/api/cliente/agenda', (req, res) => {
   res.json({ estado: agenda.estado(req.cliente.id), fila: agenda.listarFila(req.cliente.id) });
 });

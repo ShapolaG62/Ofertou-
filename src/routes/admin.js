@@ -403,6 +403,18 @@ router.get('/api/admin/grupo-automacao', (req, res) => {
   const ga = require('../grupo-automacao');
   res.json({ controle: settings.get('wa_grupo_controle') || '', ajuda: ga.AJUDA });
 });
+// ── Repostar ofertas de outros grupos (src/repostar-grupos.js) ──
+router.get('/api/admin/repostar', (req, res) => res.json(require('../repostar-grupos').painel(null)));
+router.get('/api/admin/repostar/grupos', async (req, res) => {
+  const proprio = require('../whatsapp-proprio');
+  try {
+    const todos = await proprio.carregarGrupos(proprio.donoDe(null), { todos: true });
+    res.json({ grupos: todos.map(g => ({ id: g.id, nome: g.nome, membros: g.membros, meu: g.meu })) });
+  } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
+});
+router.post('/api/admin/repostar', async (req, res) => {
+  try { res.json(await require('../repostar-grupos').salvar(null, req.body || {})); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
+});
 router.get('/api/admin/membros', (req, res) => res.json(require('../membros-grupo').resumo(null, req.query.dias)));
 router.post('/api/admin/membros/atualizar', async (req, res) => {
   try { res.json(await require('../membros-grupo').atualizarAgora(null)); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }

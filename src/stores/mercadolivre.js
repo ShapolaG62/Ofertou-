@@ -275,8 +275,26 @@ async function anuncioAgora(itemId, s) {
   return { preco: Number(r.data.price), anterior: Number(r.data.original_price) || null };
 }
 
+// Nome, preços e foto de um anúncio (link MLB-…), pela API oficial. null = não deu para consultar.
+async function dadosDoAnuncio(itemId, s) {
+  if (!s.ml_client_id || !s.ml_client_secret || !/^MLB\d+$/.test(String(itemId))) return null;
+  const r = await apiGet(`/items/${itemId}`, await getToken(s));
+  if (r.status === 404) return { disponivel: false };
+  if (!ok(r)) return null;
+  const d = r.data;
+  if (d.status !== 'active' || d.available_quantity === 0) return { disponivel: false };
+  if (!(Number(d.original_price) > Number(d.price))) return { disponivel: false }; // sem preço riscado: sem desconto
+  const foto = d.pictures?.[0]?.secure_url || d.pictures?.[0]?.url || d.thumbnail || '';
+  return {
+    store_product_id: d.id, produto: d.title, preco_atual: Number(d.price), preco_anterior: Number(d.original_price),
+    imagem: foto.replace(/^http:/, 'https:') || null,
+    original_url: `https://produto.mercadolivre.com.br/MLB-${String(d.id).replace(/^MLB/i, '')}`,
+  };
+}
+
 module.exports = {
   ofertaDoProduto,
+  dadosDoAnuncio,
   anuncioAgora,
   varredura,
   id: 'mercadolivre',

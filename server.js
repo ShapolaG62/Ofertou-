@@ -368,6 +368,7 @@ if (process.env.VERCEL) {
     if (process.env.DISABLE_MINER !== '1') require('./src/comissao-shopee').iniciar(); // comissão das ofertas antigas da Shopee
     if (process.env.DISABLE_AGENDA !== '1') require('./src/whatsapp-proprio').iniciar(); // volta a conectar o número, antes do agendamento
     if (process.env.DISABLE_AGENDA !== '1') require('./src/agenda').iniciar();
+    require('./src/repostar-grupos').iniciar(); // limpeza do registro das repostagens
     try { require('./src/palavras-proibidas').aplicar(); } catch (err) { console.error('[palavras proibidas]', err.message); } // tira do ar o que já estava no site e caiu na lista
     require('./src/relampago').iniciar({ radar: process.env.DISABLE_MINER !== '1', postar: process.env.DISABLE_AGENDA !== '1' });
     if (process.env.DISABLE_AGENDA !== '1') require('./src/alertas-whatsapp').iniciar(); // alertas de ofertas no WhatsApp particular

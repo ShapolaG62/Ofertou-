@@ -21,7 +21,9 @@ const AGENDA_KEYS = ['agenda_ativa', 'agenda_horarios', 'agenda_qtd', 'agenda_re
   'agenda_fim', 'agenda_intervalo_min', 'agenda_intervalo_max', 'agenda_por_vez', 'agenda_lojas', 'agenda_palavras_bloqueadas',
   'agenda_palavras_permitidas', 'post_modelo', 'agenda_cupons_ativa', 'agenda_cupons_horarios', 'agenda_cupons_redes', 'agenda_relampago'];
 const GRUPO_KEYS = ['grupo_slug', 'grupo_titulo', 'grupo_texto', 'grupo_pixel_meta', 'grupos_convite']; // página /g/<endereço>
-const CLIENT_KEYS = [...AFILIADO_KEYS, ...REDES_KEYS, ...AGENDA_KEYS, ...GRUPO_KEYS];
+const REPOST_KEYS = ['repost_ativo', 'repost_origens', 'repost_destinos', 'repost_por_tipo', 'repost_por_hora', 'repost_intervalo_min',
+  'repost_desconto_min', 'repost_lojas', 'repost_inicio', 'repost_fim']; // repostar de outros grupos (src/repostar-grupos.js)
+const CLIENT_KEYS = [...AFILIADO_KEYS, ...REDES_KEYS, ...AGENDA_KEYS, ...GRUPO_KEYS, ...REPOST_KEYS];
 const SECRET_KEYS = ['aliexpress_app_secret', 'shopee_app_secret', 'telegram_bot_token', 'facebook_page_token', 'x_api_secret',
   'x_access_token', 'x_access_secret'];
 // Padrões próprios do cliente

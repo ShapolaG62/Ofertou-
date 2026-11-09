@@ -182,6 +182,17 @@ const DEFAULTS = {
   post_modelo: '',              // modelo do texto das postagens (public/js/modelo-post.js); vazio = padrão
   ia_sac_ativa: '1',
   wa_grupo_controle: '',
+  // Repostar ofertas de outros grupos (src/repostar-grupos.js)
+  repost_ativo: '0',
+  repost_origens: '[]',         // grupos de outras pessoas de onde as ofertas são pegas: [{ id, nome }]
+  repost_destinos: '[]',        // grupos deste número que recebem as repostagens: [{ id, nome }]
+  repost_por_tipo: '1',         // respeita o tipo e a loja marcados em cada grupo de destino
+  repost_por_hora: '10',
+  repost_intervalo_min: '3',
+  repost_desconto_min: '15',
+  repost_lojas: '',             // vazio = todas as lojas com link de afiliado
+  repost_inicio: '08:00',
+  repost_fim: '22:00',
   ganhos_awin_publisher: '',    // KaBuM! pela Awin: ID de publisher (sincronização dos ganhos, src/ganhos-sync.js)
   ganhos_awin_token: '',        // chave da API da Awin        // grupo de automação (src/grupo-automacao.js): ID do grupo que dá os comandos            // Capi faz o primeiro atendimento do SAC (src/ia/assistente.js)
   grupo_titulo: '',             // página /grupo: título (vazio = padrão)

@@ -333,6 +333,8 @@ class Conexao {
       if (nova && ajustes.ler_mensagens && tipoEvento === 'notify' && !m.de_mim) this.sock?.readMessages?.([bruta.key]).catch(() => {});
       if (nova) emitir(this.dono, 'mensagem', { chat: m.chat, de_mim: Boolean(m.de_mim), autor: m.autor, tipo: m.tipo, texto: m.texto, id: m.wa_id, em: dataSql(m.segundos) });
     }
+    // Repostar de outros grupos: só ofertas novas dos grupos de origem escolhidos (nada delas fica guardado)
+    if (ehGrupo && tipoEvento === 'notify' && !m.de_mim && !this.saidas.has(m.wa_id)) require('./repostar-grupos').receber(cidDe(this.dono), m);
     // Grupo de automação: comandos só do que chegou agora. O que você digita no celular conta; o que esta API enviou, não.
     if (!nova || tipoEvento !== 'notify' || this.saidas.has(m.wa_id)) return;
     if (m.segundos && Date.now() / 1000 - m.segundos > IDADE_MAX_COMANDO_S) return;
