@@ -75,6 +75,12 @@ test('lê texto, legenda e mensagens embrulhadas e ignora o que não é conversa
   assert.equal(ler({ imageMessage: { caption: 'foto' } }).tipo, 'imagem');
   assert.equal(ler({ ephemeralMessage: { message: { conversation: 'some' } } }).texto, 'some');
   assert.equal(ler({ reactionMessage: { text: '👍' } }), null);
+  // Mensagens com botões (grupos de ofertas que postam por robô): o texto e os links dos botões
+  const botao = ler({ interactiveMessage: { body: { text: 'Fone JBL\nDe R$ 300,00 Por R$ 150,00' },
+    nativeFlowMessage: { buttons: [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: 'Comprar', url: 'https://mercadolivre.com/sec/abc' }) }] } } });
+  assert.equal(botao.tipo, 'texto');
+  assert.match(botao.texto, /Fone JBL[\s\S]*https:\/\/mercadolivre\.com\/sec\/abc/);
+  assert.equal(ler({ buttonsMessage: { contentText: 'Oferta https://amzn.to/x' } }).texto, 'Oferta https://amzn.to/x');
   assert.equal(ler({ conversation: 'x' }, 'status@broadcast'), null);
 });
 

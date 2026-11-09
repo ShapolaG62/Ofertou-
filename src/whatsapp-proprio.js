@@ -99,7 +99,23 @@ const TIPOS = {
   conversation: 'texto', extendedTextMessage: 'texto', imageMessage: 'imagem', videoMessage: 'video', audioMessage: 'audio',
   documentMessage: 'documento', stickerMessage: 'figurinha', contactMessage: 'contato', contactsArrayMessage: 'contato',
   locationMessage: 'localizacao', liveLocationMessage: 'localizacao', pollCreationMessage: 'enquete', pollCreationMessageV3: 'enquete',
+  // Mensagens com botões (comuns em grupos de ofertas que postam por robô)
+  buttonsMessage: 'texto', templateMessage: 'texto', interactiveMessage: 'texto', listMessage: 'texto',
 };
+// Texto da mensagem, incluindo o das mensagens com botões e os links dos botões
+function textoDe(c) {
+  const t = c.conversation || c.extendedTextMessage?.text || c.imageMessage?.caption || c.videoMessage?.caption || c.documentMessage?.caption
+    || c.buttonsMessage?.contentText || c.templateMessage?.hydratedTemplate?.hydratedContentText || c.templateMessage?.hydratedFourRowTemplate?.hydratedContentText
+    || c.interactiveMessage?.body?.text || c.listMessage?.description || '';
+  const extra = [];
+  const legenda = c.buttonsMessage?.imageMessage?.caption || c.interactiveMessage?.header?.imageMessage?.caption;
+  if (legenda && !t.includes(legenda)) extra.push(legenda);
+  for (const b of c.interactiveMessage?.nativeFlowMessage?.buttons || []) {
+    try { const p = JSON.parse(b.buttonParamsJson || '{}'); if (p.url && !t.includes(p.url)) extra.push(p.url); } catch { /* botão sem link */ }
+  }
+  for (const b of c.templateMessage?.hydratedTemplate?.hydratedButtons || []) if (b.urlButton?.url && !t.includes(b.urlButton.url)) extra.push(b.urlButton.url);
+  return [t, ...extra].filter(Boolean).join('\n');
+}
 function desembrulhar(m) {
   let atual = m;
   for (let i = 0; i < 5 && atual; i++) {
@@ -120,7 +136,7 @@ function lerMensagem(m, serializar = null) {
   const c = desembrulhar(m.message);
   const chaveTipo = c && Object.keys(TIPOS).find(k => c[k]);
   if (!chaveTipo) return null;
-  const texto = c.conversation || c.extendedTextMessage?.text || c.imageMessage?.caption || c.videoMessage?.caption || c.documentMessage?.caption || '';
+  const texto = textoDe(c);
   return {
     wa_id: String(m.key.id), chat, de_mim: m.key.fromMe ? 1 : 0, autor: m.key.fromMe ? null : (m.pushName || null),
     tipo: TIPOS[chaveTipo], texto, segundos: segundos(m.messageTimestamp), participante: m.key.participant || null,
@@ -324,7 +340,12 @@ class Conexao {
       return;
     }
     const m = lerMensagem(bruta, this.serializar);
-    if (!m) return;
+    if (!m) {
+      // Chegou sem conteúdo (a chave do grupo ainda não veio): a repostagem mostra isso no registro
+      const k = bruta?.key;
+      if (bruta?.messageStubType === 2 && !k?.fromMe && String(k?.remoteJid || '').endsWith('@g.us')) require('./repostar-grupos').naoLida(cidDe(this.dono), k.remoteJid, k.id);
+      return;
+    }
     const ehGrupo = m.chat.endsWith('@g.us');
     const meu = !ehGrupo || db.get('SELECT meu_grupo FROM whatsapp_contatos WHERE dono = ? AND jid = ?', this.dono, m.chat)?.meu_grupo === 1;
     let nova = true;
@@ -335,7 +356,8 @@ class Conexao {
       if (nova) emitir(this.dono, 'mensagem', { chat: m.chat, de_mim: Boolean(m.de_mim), autor: m.autor, tipo: m.tipo, texto: m.texto, id: m.wa_id, em: dataSql(m.segundos) });
     }
     // Repostar de outros grupos: só ofertas novas dos grupos de origem escolhidos (nada delas fica guardado)
-    if (ehGrupo && tipoEvento === 'notify' && !m.de_mim && !this.saidas.has(m.wa_id)) require('./repostar-grupos').receber(cidDe(this.dono), m);
+    // 'append': mensagens que chegaram enquanto a conexão caiu (a idade é conferida lá)
+    if (ehGrupo && (tipoEvento === 'notify' || tipoEvento === 'append') && !m.de_mim && !this.saidas.has(m.wa_id)) require('./repostar-grupos').receber(cidDe(this.dono), m);
     // Grupo de automação: comandos só do que chegou agora. O que você digita no celular conta; o que esta API enviou, não.
     if (!nova || tipoEvento !== 'notify' || this.saidas.has(m.wa_id)) return;
     if (m.segundos && Date.now() / 1000 - m.segundos > IDADE_MAX_COMANDO_S) return;

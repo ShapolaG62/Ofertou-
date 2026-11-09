@@ -29,12 +29,15 @@ db.db.exec(`
   CREATE INDEX IF NOT EXISTS idx_repostar_chave ON repostar_registro (cliente_id, chave, created_at);
 `);
 
+// Link do produto (sem o código de quem postou), para conferir depois por que uma oferta não foi repostada
+if (!db.all('PRAGMA table_info(repostar_registro)').some(c => c.name === 'link')) db.db.exec('ALTER TABLE repostar_registro ADD COLUMN link TEXT');
+
 const CHAVES = ['repost_ativo', 'repost_origens', 'repost_destinos', 'repost_por_tipo', 'repost_por_hora', 'repost_intervalo_min',
   'repost_desconto_min', 'repost_lojas', 'repost_inicio', 'repost_fim'];
 const MAX_ORIGENS = 40;
 const FILA_MAX = 15;                    // ofertas esperando a vez, por dono
 const VALIDADE_MS = 30 * 60000;         // esperou mais que isso na fila: a oferta pode ter acabado
-const IDADE_MAX_MENSAGEM_S = 300;       // mensagem antiga (o site estava fora do ar) não é repostada
+const IDADE_MAX_MENSAGEM_S = 900;       // mensagem antiga (o site estava fora do ar) não é repostada
 const JA_VISTA_MIN = 30;                // a mesma oferta vinda de vários grupos: só a primeira é tratada
 const LOJAS = ['mercadolivre', 'amazon', 'shopee', 'magalu', 'kabum', 'aliexpress'];
 
@@ -150,15 +153,16 @@ async function salvar(cid, corpo = {}) {
 
 // ── Registro (o que aparece no painel) ───────────────────────────────────────
 function registrar(cid, item, dados) {
-  db.run(`INSERT INTO repostar_registro (cliente_id, origem, chave, produto, store_id, offer_id, situacao, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  db.run(`INSERT INTO repostar_registro (cliente_id, origem, chave, produto, store_id, offer_id, situacao, motivo, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cid ? Number(cid) : null, item?.origem || null, dados.chave || null, dados.produto ? String(dados.produto).slice(0, 200) : null,
-    dados.store_id || null, dados.offer_id || null, dados.situacao, dados.motivo ? String(dados.motivo).slice(0, 300) : null);
+    dados.store_id || null, dados.offer_id || null, dados.situacao, dados.motivo ? String(dados.motivo).slice(0, 300) : null,
+    item?.link ? String(item.link).slice(0, 500) : null);
 }
 function painel(cid) {
   const s = configDe(cid);
   const a = ajustes(s);
   const dono = cid ? Number(cid) : null;
-  const registro = db.all(`SELECT r.id, r.origem, r.produto, r.store_id, r.offer_id, r.situacao, r.motivo, r.created_at FROM repostar_registro r
+  const registro = db.all(`SELECT r.id, r.origem, r.produto, r.store_id, r.offer_id, r.situacao, r.motivo, r.link, r.created_at FROM repostar_registro r
     WHERE r.cliente_id IS ? ORDER BY r.id DESC LIMIT 40`, dono);
   const hoje = db.get(`SELECT SUM(situacao = 'postada') AS postadas, SUM(situacao = 'ignorada') AS ignoradas, SUM(situacao = 'erro') AS erros
     FROM repostar_registro WHERE cliente_id IS ? AND created_at >= datetime('now', '-24 hours')`, dono) || {};
@@ -167,6 +171,8 @@ function painel(cid) {
     ajustes: a, registro, fila: (filas.get(chaveDono(cid)) || []).length,
     resumo: { postadas: hoje.postadas || 0, ignoradas: hoje.ignoradas || 0, erros: hoje.erros || 0, ultima_hora: postadasNaUltimaHora(cid) },
     sem_afiliado: semAfiliado, lojas: LOJAS, grupos_destino: gruposDestino(s),
+    // O que chegou de cada grupo de origem desde que o site ligou (mostra se o número está recebendo as mensagens)
+    recebidas: a.origens.map(g => ({ id: g.id, nome: g.nome, ...(vistas.get(`${chaveDono(cid)}|${g.id}`) || { total: 0, ilegiveis: 0, ultima: null }) })),
   };
 }
 const postadasNaUltimaHora = cid => db.get(`SELECT COUNT(*) AS n FROM repostar_registro WHERE cliente_id IS ? AND situacao = 'postada' AND created_at >= datetime('now', '-1 hour')`, cid ? Number(cid) : null).n;
@@ -233,20 +239,45 @@ async function lerNaLoja(store, url, pid) {
   return null;
 }
 
+async function produtoNaPaginaML(url) {
+  try {
+    const res = await require('./net').safeGet(url, { maxContentLength: 4 * 1024 * 1024, timeout: 12000, responseType: 'text' });
+    const html = String(res.data || '');
+    const catalogo = /\/p\/(MLB\d{6,})/i.exec(html);
+    if (catalogo) return { pid: catalogo[1].toUpperCase(), url: `https://www.mercadolivre.com.br/p/${catalogo[1].toUpperCase()}` };
+    const item = /\b(MLB)-?(\d{8,})\b/i.exec(html);
+    if (item) return { pid: `MLB${item[2]}`, url: `https://produto.mercadolivre.com.br/MLB-${item[2]}` };
+  } catch (err) { log(`página do Mercado Livre: ${err.message}`); }
+  return null;
+}
+
 // { o, store, chave } | { erro, store?, chave? } | { silencio: true } (não era oferta ou já foi tratada)
 async function ofertaDaMensagem(cid, item) {
   const { storeFromUrl } = require('./stores');
   let achado = null;
+  const idDe = (st, u) => (st?.productIdFromUrl ? st.productIdFromUrl(u) : null);
   for (const url of item.urls) {
     let final = url, store = storeFromUrl(url);
-    if (!store) { try { final = await resolver(url); store = storeFromUrl(final); } catch { /* não abriu */ } }
+    // Link encurtado, ou da loja mas sem o código do produto (link de afiliado curto): segue até o endereço final
+    if (!store || !idDe(store, url)) {
+      try { const f = await resolver(url); const st = storeFromUrl(f); if (st) { final = f; store = st; } } catch { /* não abriu */ }
+    }
     if (store && LOJAS.includes(store.id)) { achado = { store, final }; break; }
   }
-  if (!achado) return /r\$\s*\d/i.test(item.texto) ? { erro: 'O link não é de uma loja atendida (Mercado Livre, Amazon, Shopee, Magalu, KaBuM!, AliExpress).' } : { silencio: true };
+  if (!achado) {
+    item.link = item.urls[0];
+    return { erro: 'O link da mensagem não é de uma loja atendida (Mercado Livre, Amazon, Shopee, Magalu, KaBuM!, AliExpress).' };
+  }
   const { store } = achado;
-  const limpo = limparLink(store, achado.final);
+  let limpo = limparLink(store, achado.final);
+  item.link = limpo || achado.final;
   if (!limpo) return { erro: `Não consegui ler o endereço do produto da ${store.name}.`, store };
-  const pid = store.productIdFromUrl ? store.productIdFromUrl(achado.final) || store.productIdFromUrl(limpo) : null;
+  let pid = idDe(store, achado.final) || idDe(store, limpo);
+  // Página do Mercado Livre sem o código no endereço (perfil de afiliado, "social"): procura o produto dentro da página
+  if (!pid && store.id === 'mercadolivre') {
+    const doML = await produtoNaPaginaML(achado.final);
+    if (doML) { pid = doML.pid; limpo = doML.url; item.link = limpo; }
+  }
   const chave = `${store.id}:${pid || crypto.createHash('sha1').update(limpo).digest('hex').slice(0, 16)}`;
   const dono = cid ? Number(cid) : null;
   // A mesma oferta costuma aparecer em vários grupos: trata uma vez (e não reposta o que já saiu nas últimas 24 h)
@@ -302,18 +333,48 @@ const trabalhando = new Set();
 const emAndamento = new Set();
 const ultimaPostagem = new Map();
 
+const vistas = new Map(); // "dono|grupo" → { total, ilegiveis, ultima }
+function contar(cid, chat, campo) {
+  const k = `${chaveDono(cid)}|${chat}`;
+  const v = vistas.get(k) || { total: 0, ilegiveis: 0, ultima: null };
+  v[campo]++;
+  v.ultima = new Date().toISOString();
+  vistas.set(k, v);
+}
+const ilegiveisAvisadas = new Set();
+// O WhatsApp entregou a mensagem sem o conteúdo (a chave do grupo ainda não chegou para este número). Ele pede de novo
+// sozinho; se o conteúdo chegar, a oferta é tratada normalmente.
+function naoLida(cid, chat, waId) {
+  try {
+    const c = ajustesRapidos(cid);
+    if (!c.ativo || !c.origens.has(chat)) return;
+    contar(cid, chat, 'ilegiveis');
+    const k = `${chaveDono(cid)}|${waId}`;
+    if (ilegiveisAvisadas.has(k)) return;
+    if (ilegiveisAvisadas.size > 2000) ilegiveisAvisadas.clear();
+    ilegiveisAvisadas.add(k);
+    registrar(cid, { origem: c.origens.get(chat) }, { situacao: 'ignorada',
+      motivo: 'O WhatsApp entregou esta mensagem sem o conteúdo (o grupo ainda não liberou a leitura para este número). O site pediu de novo; se chegar, a oferta aparece aqui.' });
+  } catch (err) { log(err.message); }
+}
+
 function receber(cid, m) {
   try {
-    if (!m || m.de_mim || !String(m.chat || '').endsWith('@g.us') || !m.texto) return false;
-    if (m.segundos && Date.now() / 1000 - m.segundos > IDADE_MAX_MENSAGEM_S) return false;
+    if (!m || m.de_mim || !String(m.chat || '').endsWith('@g.us')) return false;
     const c = ajustesRapidos(cid);
     if (!c.ativo || !c.origens.has(m.chat)) return false;
+    contar(cid, m.chat, 'total');
+    if (!m.texto) return false;
     const urls = linksDa(m.texto);
     if (!urls.length) return false;
+    if (m.segundos && Date.now() / 1000 - m.segundos > IDADE_MAX_MENSAGEM_S) {
+      registrar(cid, { origem: c.origens.get(m.chat), link: urls[0] }, { situacao: 'ignorada', motivo: 'A mensagem chegou atrasada (mais de 15 minutos depois de postada): a oferta pode ter acabado.' });
+      return false;
+    }
     const k = chaveDono(cid);
     if (!filas.has(k)) filas.set(k, []);
     const fila = filas.get(k);
-    fila.push({ urls, texto: String(m.texto).slice(0, 4000), bruta: m.bruta || null, origem: c.origens.get(m.chat), grupo: m.chat, chegou: Date.now() });
+    fila.push({ urls, texto: String(m.texto).slice(0, 4000), bruta: m.bruta || null, origem: c.origens.get(m.chat), grupo: m.chat, link: urls[0], chegou: Date.now() });
     while (fila.length > FILA_MAX) {
       const fora = fila.shift();
       registrar(cid, fora, { situacao: 'ignorada', motivo: 'Chegaram ofertas demais de uma vez: esta ficou de fora.' });
@@ -411,8 +472,8 @@ function iniciar() {
 // Só para os testes
 const _paraTestes = ({ pausa, zerar } = {}) => {
   if (pausa !== undefined) pausas = pausa;
-  if (zerar) { filas.clear(); trabalhando.clear(); emAndamento.clear(); ultimaPostagem.clear(); cacheAjustes.clear(); resolvidos.clear(); }
+  if (zerar) { filas.clear(); trabalhando.clear(); emAndamento.clear(); ultimaPostagem.clear(); cacheAjustes.clear(); resolvidos.clear(); vistas.clear(); ilegiveisAvisadas.clear(); }
 };
 const ocupado = cid => trabalhando.has(chaveDono(cid));
 
-module.exports = { CHAVES, receber, salvar, painel, limparLink, linksDa, ajustes, iniciar, ocupado, _paraTestes };
+module.exports = { CHAVES, receber, naoLida, salvar, painel, limparLink, linksDa, ajustes, iniciar, ocupado, _paraTestes };

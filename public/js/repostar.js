@@ -118,6 +118,7 @@
     <div class="rp-secao">
       <div class="rp-topo"><h3 style="margin:0">Últimas 24 horas</h3><button class="btn small" type="button" id="rp-atualizar">Atualizar</button></div>
       <div class="rp-resumo" id="rp-resumo" style="margin-top:8px"></div>
+      <p class="hint cli-hint" id="rp-recebidas" style="margin:10px 0 0"></p>
       <div class="rp-reg" id="rp-registro"></div>
     </div>`;
   const $ = id => document.getElementById(id);
@@ -194,12 +195,14 @@
   }
   function desenharRegistro() {
     const r = dados.resumo;
+    const rec = dados.recebidas || [];
+    $('rp-recebidas').innerHTML = rec.length ? `<b>Mensagens recebidas dos grupos de origem</b> (desde a última vez que o site ligou): ${rec.map(g => `${esc(g.nome)}: ${g.total}${g.ilegiveis ? ` (+${g.ilegiveis} sem conteúdo)` : ''}${g.ultima ? `, a última às ${new Date(g.ultima).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`).join(' · ')}` : '';
     $('rp-resumo').innerHTML = [
       [r.postadas, 'postadas'], [r.ignoradas, 'não postadas'], [r.erros, 'falharam'], [`${r.ultima_hora}/${dados.ajustes.por_hora}`, 'na última hora'],
     ].map(([n, t]) => `<div class="rp-num"><b>${esc(n)}</b><span>${t}</span></div>`).join('');
     $('rp-registro').innerHTML = dados.registro.length ? dados.registro.map(x => `<div class="rp-item">
         <span class="rp-tag ${esc(x.situacao)}">${SITUACAO[x.situacao] || esc(x.situacao)}</span><small>${quando(x.created_at)}${x.origem ? ` · de ${esc(x.origem)}` : ''}${x.store_id ? ` · ${esc(LOJAS[x.store_id] || x.store_id)}` : ''}</small>
-        ${x.produto ? `<div><b>${esc(x.produto)}</b></div>` : ''}${x.motivo ? `<div><small>${esc(x.motivo)}</small></div>` : ''}</div>`).join('')
+        ${x.produto ? `<div><b>${esc(x.produto)}</b></div>` : ''}${x.motivo ? `<div><small>${esc(x.motivo)}</small></div>` : ''}${x.link && /^https?:\/\//.test(x.link) ? `<div><small><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.link.length > 70 ? `${x.link.slice(0, 70)}…` : x.link)}</a></small></div>` : ''}</div>`).join('')
       : '<p class="hint cli-hint">Nenhuma oferta vista ainda. Quando chegar oferta nos grupos de origem, ela aparece aqui.</p>';
   }
   function preencher() {
@@ -227,7 +230,7 @@
     try { dados = await pedir(); preencher(); } catch (err) { $('rp-msg').textContent = err.message; }
   }
   async function atualizarRegistro() {
-    try { const d = await pedir(); dados.registro = d.registro; dados.resumo = d.resumo; desenharRegistro(); } catch { /* tenta de novo depois */ }
+    try { const d = await pedir(); dados.registro = d.registro; dados.resumo = d.resumo; dados.recebidas = d.recebidas; desenharRegistro(); } catch { /* tenta de novo depois */ }
   }
   $('rp-atualizar').addEventListener('click', atualizarRegistro);
   $('rp-ativo').addEventListener('change', () => { $('rp-ativo-txt').textContent = $('rp-ativo').checked ? 'Ligado (salve para valer)' : 'Desligado (salve para valer)'; });

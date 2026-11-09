@@ -180,6 +180,41 @@ test('cada grupo de destino recebe só das origens marcadas nele', async () => {
   assert.match(registro().find(r => /B0REPOST09/.test(r.chave)).motivo, /deste grupo de origem/);
 });
 
+test('link curto do Mercado Livre e página de perfil de afiliado: acha o produto e guarda o link no registro', async () => {
+  configurar();
+  const net = require('../src/net');
+  const { resolverLink, safeGet } = net;
+  net.resolverLink = async u => (/sec\/CURTO1/.test(u) ? 'https://produto.mercadolivre.com.br/MLB-4455667788-fone-teste-_JM?matt_word=outro'
+    : /sec\/CURTO2/.test(u) ? 'https://www.mercadolivre.com.br/social/outrapessoa?matt_word=outro&ref=x' : u);
+  net.safeGet = async () => ({ status: 200, data: '<html><a href="https://www.mercadolivre.com.br/caixa-de-som/p/MLB55667788">ver</a></html>' });
+  try {
+    repostar.receber(null, mensagem('Fone Repostar Link Curto ML\nDe R$ 200,00 Por R$ 100,00\nhttps://mercadolivre.com/sec/CURTO1'));
+    await ate(() => registro().some(r => r.chave === 'mercadolivre:MLB4455667788'));
+    const r1 = registro().find(r => r.chave === 'mercadolivre:MLB4455667788');
+    assert.equal(r1.situacao, 'postada', r1.motivo);
+    assert.equal(r1.link, 'https://produto.mercadolivre.com.br/MLB-4455667788-fone-teste-_JM');
+    repostar.receber(null, mensagem('Caixa de Som Repostar Perfil ML\nDe R$ 300,00 Por R$ 150,00\nhttps://mercadolivre.com/sec/CURTO2', ORIGEM2));
+    await ate(() => registro().some(r => r.chave === 'mercadolivre:MLB55667788'));
+    assert.equal(registro().find(r => r.chave === 'mercadolivre:MLB55667788').link, 'https://www.mercadolivre.com.br/p/MLB55667788');
+  } finally { net.resolverLink = resolverLink; net.safeGet = safeGet; }
+});
+
+test('mensagem sem conteúdo, atrasada ou com link de fora: aparece no registro e na contagem de cada origem', async () => {
+  configurar();
+  repostar.naoLida(null, ORIGEM, 'ILEGIVEL1');
+  repostar.naoLida(null, ORIGEM, 'ILEGIVEL1');
+  repostar.naoLida(null, '120363000000000999@g.us', 'ILEGIVEL2');
+  assert.equal(registro().filter(r => /sem o conteúdo/.test(r.motivo || '')).length, 1);
+  repostar.receber(null, mensagem('De R$ 100,00 Por R$ 50,00 https://www.amazon.com.br/dp/B0REPOST10', ORIGEM, { segundos: Math.floor(Date.now() / 1000) - 1200 }));
+  assert.match(registro().at(-1).motivo, /atrasada/);
+  repostar.receber(null, mensagem('Bom dia!', ORIGEM2));
+  const p = repostar.painel(null);
+  const ana = p.recebidas.find(g => g.id === ORIGEM), ach = p.recebidas.find(g => g.id === ORIGEM2);
+  assert.equal(ana.total, 1);
+  assert.equal(ana.ilegiveis, 2);
+  assert.equal(ach.total, 1);
+});
+
 test('afiliado (cliente da ferramenta): usa a configuração e o link dele', async () => {
   const clientes = require('../src/clientes');
   const cid = clientes.criar({ nome: 'Afiliado Teste', email: 'afiliado-repostar@exemplo.test', senha: 'Senha-Forte-123!x', dias: 30 });
