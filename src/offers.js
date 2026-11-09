@@ -6,7 +6,7 @@ const { getStore } = require('./stores');
 const { classifyCategory, classifySubcategory } = require('./categorize');
 const { discountOf, round2 } = require('./util');
 
-const MAX_DISCOUNT = 95; // acima disso quase sempre é erro de leitura de preço
+const MAX_DISCOUNT = 99; // acima disso é erro de leitura de preço; entre 85% e 99% a oferta entra, marcada como suspeita
 
 // Oferta "no ar": não oculta, dentro da validade e, se for de uma loja parceira, com a loja visível
 // e o dono com a conta liberada (banido/suspenso some do site imediatamente).

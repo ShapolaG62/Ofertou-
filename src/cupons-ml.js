@@ -126,6 +126,14 @@ function listar() {
 }
 
 // Ofertas lidas pela extensão na página de ofertas do Mercado Livre. As marcadas "relâmpago" entram com a hora do fim, se a página mostrar.
+// Endereço guardado da oferta: sem rastreio; no link /up/ (vários vendedores) fica o pdp_filters do anúncio lido
+function urlDoAnuncio(url, item) {
+  const base = `${url.origin}${url.pathname}`;
+  if (!/\/up\//i.test(url.pathname)) return base;
+  const filtro = url.searchParams.get('pdp_filters') || (/^MLB\d{6,}$/i.test(String(item || '')) ? `item_id:${String(item).toUpperCase()}` : null);
+  return filtro ? `${base}?pdp_filters=${encodeURIComponent(filtro)}` : base;
+}
+
 function importarOfertas(itens) {
   const s = settings.getAll();
   const out = { recebidos: 0, gravados: 0, relampagos: 0 };
@@ -143,7 +151,7 @@ function importarOfertas(itens) {
     const fim = fimLido > Date.now() && fimLido < Date.now() + 7 * 86400000 ? fimLido : resta > 0 && resta < 7 * 86400 ? Date.now() + resta * 1000 : 0;
     const deal = {
       store_product_id: `MLB${id[1]}`, produto: nome, preco_atual: atual, preco_anterior: anterior,
-      imagem: /^https:\/\//.test(it.imagem || '') ? it.imagem : null, original_url: `${url.origin}${url.pathname}`,
+      imagem: /^https:\/\//.test(it.imagem || '') ? it.imagem : null, original_url: urlDoAnuncio(url, it.item),
       ...(it.relampago ? { relampago: { fim } } : {}),
     };
     if (offers.saveDeal(ml, deal, { settings: s, manterCupom: true })) { out.gravados++; if (it.relampago) out.relampagos++; }

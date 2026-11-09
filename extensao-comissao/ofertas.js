@@ -1,6 +1,8 @@
 // Ofertou! — coleta das ofertas do Mercado Livre (só age quando ligada pelo botão "Coletar agora" do Painel).
 //  1. Lê até 10 páginas de ofertas relâmpago, rolando como uma pessoa (para antes se a lista acabar);
-//  2. Guarda o que achou e segue para a comissão extra e depois para os cupons ativos;
+//  2. Lê as páginas gerais de "Ofertas do dia" (até 20): trazem também os anúncios fora do catálogo (/up/…), que a
+//     API do Mercado Livre não deixa o site ler;
+//  3. Guarda o que achou e segue para a comissão extra e depois para os cupons ativos;
 //  3. No fim, a mineração de cupons volta para o Painel, que grava tudo.
 // Só lê as páginas. Se o Mercado Livre pedir login ou verificação, não tenta nada: segue em frente sem as ofertas.
 (() => {
@@ -11,7 +13,8 @@
   const espera = ms => new Promise(r => setTimeout(r, ms));
   const num = s => { const t = String(s || '').replace(/[^\d,.]/g, ''); return t ? Number(t.replace(/\./g, '').replace(',', '.')) : null; };
   const COMISSAO = 'https://www.mercadolivre.com.br/afiliados/hub?is_affiliate=true';
-  const paginaDe = n => {
+  const paginaDe = (n, fase = 'relampago') => {
+    if (fase === 'gerais') return `https://www.mercadolivre.com.br/ofertas${n > 1 ? `?page=${n}` : ''}`;
     const q = new URLSearchParams({ container_id: 'MLB779362-1', promotion_type: 'lightning' });
     if (n > 1) q.set('page', n);
     return `https://www.mercadolivre.com.br/ofertas?${q}`;
@@ -56,7 +59,7 @@
     }
     return restante(card.innerText || '');
   }
-  function lerCartoes() {
+  function lerCartoes(relampago = true) {
     const out = [];
     for (const card of document.querySelectorAll('.poly-card, .promotion-item')) {
       const a = card.querySelector('a.poly-component__title, .poly-component__title-wrapper a, a[href*="MLB"]');
@@ -72,7 +75,7 @@
         produto, item: item ? `MLB${item}` : null, link: href,
         nome: (card.querySelector('.poly-component__title')?.textContent || a?.textContent || '').trim().slice(0, 200),
         preco, preco_anterior: anterior, imagem: img?.getAttribute('data-src') || img?.src || null,
-        relampago: true, ...(() => { const s = restanteDoCartao(card); return s > 0 ? { resta_s: s, fim_ms: Date.now() + s * 1000 } : {}; })(),
+        relampago, ...(relampago ? (() => { const s = restanteDoCartao(card); return s > 0 ? { resta_s: s, fim_ms: Date.now() + s * 1000 } : {}; })() : {}),
       });
     }
     return out;
@@ -84,7 +87,7 @@
     if (!j) return;
     // A comissão extra (mercadolivre.js) segue para os cupons quando terminar
     await chrome.storage.local.set({ ofertasResultado: { em: Date.now(), motivo, completa, itens: Object.values(j.itens || {}) }, coletaJob: { cupons: j.cupons, painel: j.painel, em: Date.now() }, autoAte: Date.now() + 10 * 60 * 1000, rolagens: 10 });
-    caixa('Ofertas relâmpago lidas. Agora a comissão extra…');
+    caixa('Ofertas lidas. Agora a comissão extra…');
     location.href = COMISSAO;
   }
 
@@ -92,19 +95,28 @@
     const { ofertasJob: j } = await chrome.storage.local.get('ofertasJob');
     if (!j || Date.now() > j.ate) { if (j) await chrome.storage.local.remove('ofertasJob'); return; }
     await espera(1500);
-    caixa(`Lendo ofertas relâmpago, página ${j.pagina} de ${j.paginas}…`);
+    const rel = (j.fase || 'relampago') === 'relampago';
+    caixa(rel ? `Lendo ofertas relâmpago, página ${j.pagina} de ${j.paginas}…` : `Lendo as ofertas do dia, página ${j.pagina} de ${j.paginas}…`);
     for (let i = 0; i < 6; i++) { window.scrollBy(0, innerHeight); await espera(700); }
-    const lidos = lerCartoes();
+    const lidos = lerCartoes(rel);
     const antes = Object.keys(j.itens).length;
-    for (const it of lidos) j.itens[it.produto || it.item] = it;
+    // A relâmpago vale mais (tem hora para acabar): a mesma oferta lida depois nas gerais não a substitui
+    for (const it of lidos) { const k = it.produto || it.item; if (rel || !j.itens[k]) j.itens[k] = it; }
     const total = Object.keys(j.itens).length;
-    caixa(`${total} ofertas relâmpago até agora…`);
-    // Acabou: última página, página vazia ou só repetidos
-    // "completa": a lista acabou antes do limite de páginas, então o que não veio já não está em promoção
-    if (!lidos.length || total === antes || j.pagina >= j.paginas) return terminar(total ? 'ok' : 'sem-dados', Boolean(total) && j.pagina < j.paginas);
+    caixa(`${total} ofertas até agora…`);
+    // Acabou: última página, página vazia ou (nas relâmpago) só repetidos
+    const acabou = !lidos.length || j.pagina >= j.paginas || (rel && total === antes);
+    if (acabou && rel && j.paginasGerais > 0) {
+      // "completa": a lista relâmpago acabou antes do limite de páginas, então o que não veio já não está em promoção
+      await chrome.storage.local.set({ ofertasJob: { ...j, fase: 'gerais', pagina: 1, paginas: j.paginasGerais, completaRel: Boolean(total) && j.pagina < j.paginas } });
+      await espera(1500);
+      location.href = paginaDe(1, 'gerais');
+      return;
+    }
+    if (acabou) return terminar(total ? 'ok' : 'sem-dados', rel ? Boolean(total) && j.pagina < j.paginas : Boolean(j.completaRel));
     const pagina = j.pagina + 1;
     await chrome.storage.local.set({ ofertasJob: { ...j, pagina } });
     await espera(1500);
-    location.href = paginaDe(pagina);
+    location.href = paginaDe(pagina, rel ? 'relampago' : 'gerais');
   })();
 })();

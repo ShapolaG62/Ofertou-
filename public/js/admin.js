@@ -884,15 +884,17 @@ async function mlcImportar(d) {
   const produtos = d.produtos && typeof d.produtos === 'object' ? Object.entries(d.produtos) : [];
   const ofertas = Array.isArray(d.ofertas) ? d.ofertas : [];
   try {
-    // Primeiro as relâmpago: têm hora para acabar e não podem depender do resto
+    // Primeiro as ofertas (relâmpago e do dia): as relâmpago têm hora para acabar e não podem depender do resto
     let rel = 0, grav = 0, encerradas = 0, falhaOfertas = '';
     try {
       for (let i = 0; i < ofertas.length; i += 200) {
-        out.textContent = `Gravando ofertas relâmpago… ${Math.min(i + 200, ofertas.length)} de ${ofertas.length}`;
+        out.textContent = `Gravando ofertas… ${Math.min(i + 200, ofertas.length)} de ${ofertas.length}`;
         const r = await api('/api/admin/mineracao/ml-ofertas', { method: 'POST', body: { itens: ofertas.slice(i, i + 200) } });
         grav += r.gravados; rel += r.relampagos;
       }
-      if (ofertas.length) encerradas = (await api('/api/admin/mineracao/ml-ofertas', { method: 'POST', body: { vistos: ofertas.map(o => o.produto || o.item), completa: d.ofertas_completa === true } })).encerradas;
+      // Só as lidas nas páginas de relâmpago dizem quais relâmpago continuam
+      const relampagos = ofertas.filter(o => o.relampago !== false);
+      if (relampagos.length) encerradas = (await api('/api/admin/mineracao/ml-ofertas', { method: 'POST', body: { vistos: relampagos.map(o => o.produto || o.item), completa: d.ofertas_completa === true } })).encerradas;
     } catch (err) { falhaOfertas = err.message; }
     for (let i = 0; i < lista.length; i += 200) {
       out.textContent = `Gravando cupons… ${Math.min(i + 200, lista.length)} de ${lista.length}`;

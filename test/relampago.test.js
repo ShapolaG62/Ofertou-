@@ -118,6 +118,18 @@ test('Mercado Livre: importa as ofertas da extensão sem apagar o cupom', () => 
   assert.equal(o.relampago_fim_real, 1);
 });
 
+test('Mercado Livre: oferta do dia fora do catálogo (link /up/) entra com o anúncio certo, sem virar relâmpago', () => {
+  const cml = require('../src/cupons-ml');
+  const r = cml.importarOfertas([{ item: 'MLB6501664470', nome: 'Microfone Uhf Sem Fio Duplo Outlet', preco: 1129.41, preco_anterior: 1340,
+    link: 'https://www.mercadolivre.com.br/up/MLBU3864817912', relampago: false }]);
+  assert.equal(r.gravados, 1);
+  assert.equal(r.relampagos, 0);
+  const o = db.get("SELECT * FROM offers WHERE store_id = 'mercadolivre' AND store_product_id = 'MLB6501664470'");
+  assert.equal(o.original_url, 'https://www.mercadolivre.com.br/up/MLBU3864817912?pdp_filters=item_id%3AMLB6501664470');
+  assert.match(o.affiliate_url, /pdp_filters=item_id%3AMLB6501664470/);
+  assert.equal(o.relampago_tipo, null);
+});
+
 test('primeira página: relâmpagos na frente, sem encher a página e sem mexer na busca', async () => {
   const busca = require('../src/busca-ofertas');
   db.run('UPDATE offers SET relampago_fim = NULL, relampago_tipo = NULL, relampago_desde = NULL');
@@ -337,7 +349,7 @@ test('extensão: lê o relógio em dígitos separados do cartão do Mercado Livr
   const sandbox = { console, Number, String, Object, Math, URLSearchParams, Date, decodeURIComponent, setTimeout: () => 0, innerHeight: 800,
     chrome: { storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } } }, location: {}, document: { querySelectorAll: () => cards, createElement: () => ({ style: {} }), documentElement: { append() {} } } };
   sandbox.window = sandbox;
-  const codigo = fs.readFileSync(path.join(__dirname, '../extensao-comissao/ofertas.js'), 'utf8').replace('function lerCartoes() {', 'window.__ler = () => lerCartoes(); function lerCartoes() {');
+  const codigo = fs.readFileSync(path.join(__dirname, '../extensao-comissao/ofertas.js'), 'utf8').replace('function lerCartoes(relampago = true) {', 'window.__ler = () => lerCartoes(); function lerCartoes(relampago = true) {');
   vm.runInNewContext(codigo, sandbox);
   cards = [relogio];
   assert.equal(sandbox.__ler()[0].resta_s, 8 * 3600 + 7 * 60 + 13);
