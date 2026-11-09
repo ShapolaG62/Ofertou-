@@ -147,7 +147,7 @@ body:not(.is-admin) .admin-only { display: none !important; }
 }
 .store-tab:hover { background: var(--surface-3); color: var(--ink); }
 .store-tab[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
-.store-tab .count { font-weight: 500; font-size: 12px; opacity: .65; }
+.store-tab .count { font-weight: 500; font-size: 12px; opacity: .85; }
 .store-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .store-tab[disabled] { opacity: .45; cursor: default; }
 .store-tab[disabled]:hover { background: none; }
@@ -2954,7 +2954,7 @@ textarea.modelo-texto { font-family: inherit; font-size: 14px; line-height: 1.5;
 .v2 .grid .card { padding: 0; box-shadow: none; }
 .v2 .card-media { margin: 10px 10px 0; border: 0; border-radius: 10px; background: var(--foto); }
 .v2 .card-media img { padding: 10px; mix-blend-mode: multiply; }
-.v2 .card-off { background: #ef4444; }
+.v2 .card-off { background: #d42020; } /* branco sobre este vermelho: 5,3:1 */
 .v2 .card-tags .badge-low { padding: 3px 8px; border-radius: 7px; background: #16a34a; color: #fff; font-size: 12px; }
 .v2 .card-body { gap: 7px; }
 .v2 .card-title { order: 0; font-weight: 600; }
@@ -3678,3 +3678,6 @@ body .tabs-line:not(.cli-nav) button[aria-selected="true"] { background: var(--a
 .card-relampago b { font-variant-numeric: tabular-nums; }
 .card-relampago .rel-acaba { white-space: pre; }
 @media (max-width: 520px) { .card-relampago .rel-acaba { display: none; } }
+
+/* Cupons: botão "Mostrar mais" ocupa a linha inteira da grade */
+.cupons-mais { grid-column: 1 / -1; display: flex; justify-content: center; padding: 8px 0 4px; }

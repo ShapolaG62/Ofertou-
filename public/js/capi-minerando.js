@@ -22,7 +22,7 @@
     font-size: 13px; font-weight: 700; line-height: 1.25; box-shadow: 0 6px 20px -6px rgba(0,0,0,.4); transform-origin: 15% 100%;
     animation: cm-pop .35s .35s cubic-bezier(.2,1.6,.4,1) both; white-space: nowrap; }
   .cm-balao::after { content: ""; position: absolute; left: 22px; bottom: -7px; border: 8px solid transparent; border-top-color: #fff; border-bottom: 0; }
-  .cm-balao b { color: #0c8f4f; }
+  .cm-balao b { color: #0a7a43; }
   .cm-balao.troca { animation: cm-pop .35s cubic-bezier(.2,1.6,.4,1) both; }
   .cm-quadro { position: relative; width: 210px; height: 210px; }
   .cm-quadro canvas { width: 100%; height: 100%; display: block; }
@@ -40,11 +40,11 @@
   let meta = null;
   const folhas = {};
   async function carregar(nome) {
-    meta ||= await fetch(`${PASTA}animacoes.json?v=20261325`).then(r => r.json());
+    meta ||= await fetch(`${PASTA}animacoes.json?v=20261326`).then(r => r.json());
     const m = meta[nome];
     if (!folhas[nome]) {
       const img = new Image();
-      img.src = PASTA + m.arquivo + '?v=20261325';
+      img.src = PASTA + m.arquivo + '?v=20261326';
       // onload em vez de img.decode(): o decode() pode ficar pendurado em alguns navegadores
       folhas[nome] = new Promise((ok, erro) => {
         img.onload = () => ok(img);

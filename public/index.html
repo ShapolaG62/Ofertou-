@@ -25,20 +25,22 @@
 <link rel="manifest" href="/site.webmanifest" crossorigin="use-credentials">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=20261325">
-<script src="/js/tema.js?v=20261325"></script>
-<script src="/js/app-nativo.js?v=20261325"></script>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap"></noscript>
+<link rel="stylesheet" href="/css/site.css?v=20261326">
+<script src="/js/tema.js?v=20261326"></script>
+<script src="/js/app-nativo.js?v=20261326"></script>
 <script type="application/ld+json">
 [{"@context":"https://schema.org","@type":"WebSite","name":"Ofertou!","url":"https://tanoofertou.com.br/","potentialAction":{"@type":"SearchAction","target":"https://tanoofertou.com.br/?q={search_term_string}","query-input":"required name=search_term_string"}},
 {"@context":"https://schema.org","@type":"Organization","name":"Ofertou!","url":"https://tanoofertou.com.br/","logo":"https://tanoofertou.com.br/images/icon-512.png"}]
 </script>
-<script src="/js/dialogo.js?v=20261325"></script>
-<script src="/js/capi-minerando.js?v=20261325" defer></script>
-<script src="/js/rodape-legal.js?v=20261325" defer></script>
-<script src="/js/instalar-app.js?v=20261325" defer></script>
-<script src="/js/cookies.js?v=20261325"></script>
-<script src="/js/seletor.js?v=20261325" defer></script>
+<script src="/js/dialogo.js?v=20261326" defer></script>
+<script src="/js/capi-minerando.js?v=20261326" defer></script>
+<script src="/js/rodape-legal.js?v=20261326" defer></script>
+<script src="/js/instalar-app.js?v=20261326" defer></script>
+<script src="/js/cookies.js?v=20261326" defer></script>
+<script src="/js/seletor.js?v=20261326" defer></script>
 </head>
 <body class="v2">
 
@@ -71,7 +73,7 @@
       <a class="btn btn-sm" href="/conta" id="account-link">Entrar/Cadastro</a>
       <button class="btn btn-sm pf-atalho conta-btn" type="button" id="conta-btn" hidden aria-haspopup="menu" aria-expanded="false" aria-controls="conta-pop">
         <img id="perfil-link-img" alt="" hidden referrerpolicy="no-referrer"><span id="conta-nome">Minha conta</span><svg class="conta-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
-      <a class="btn btn-wa" id="wa-header" href="#" target="_blank" rel="noopener" hidden><svg><use href="#i-wa"/></svg><span>Grupo de ofertas</span></a>
+      <a class="btn btn-wa" id="wa-header" href="#" target="_blank" rel="noopener" aria-label="Grupo de ofertas no WhatsApp" hidden><svg><use href="#i-wa"/></svg><span>Grupo de ofertas</span></a>
     </div>
   </div>
   <nav class="store-nav" aria-label="Lojas">
@@ -188,7 +190,7 @@
   <section class="community" id="community" hidden>
     <div class="container">
       <div class="community-box">
-        <img src="/images/pet-capi-head.png" alt="" width="84" height="84">
+        <img src="/images/pet-capi-head.png" alt="" width="84" height="84" loading="lazy" decoding="async">
         <div>
           <h2>Receba as melhores ofertas no WhatsApp</h2>
           <p>Entre no grupo e veja as promoções assim que forem encontradas.</p>
@@ -267,11 +269,11 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<script src="/js/publicidade.js?v=20261325" data-espacos="topo,meio,lateral" defer></script>
-<script src="/js/site.js?v=20261325" defer></script>
-<script src="/js/comunidade.js?v=20261325" defer></script>
-<script src="/js/avisos-entrada.js?v=20261325" data-auto defer></script>
-<script src="/js/alertas-whatsapp.js?v=20261325" defer></script>
-<script src="/js/chat-topo.js?v=20261325" defer></script>
+<script src="/js/publicidade.js?v=20261326" data-espacos="topo,meio,lateral" defer></script>
+<script src="/js/site.js?v=20261326" defer></script>
+<script src="/js/comunidade.js?v=20261326" defer></script>
+<script src="/js/avisos-entrada.js?v=20261326" data-auto defer></script>
+<script src="/js/alertas-whatsapp.js?v=20261326" defer></script>
+<script src="/js/chat-topo.js?v=20261326" defer></script>
 </body>
 </html>

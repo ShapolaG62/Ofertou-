@@ -52,6 +52,7 @@
   const PAGINA_SEO = window.OFERTOU_PAGINA || null; // /ofertas/celulares etc. (src/paginas/ofertas-seo.js)
   const state = { loja: '', cat: '', tipo: '', q: '', min: null, max: null, desc: 0, com: '', cupom: '', rel: false, ordem: 'destaques', pagina: 1, vista: '' };
   let CUPONS = null; // lista de cupons ativos (a vista "Cupons" troca os produtos por ela)
+  let cuponsVisiveis = 60; // quantos cupons aparecem ("Mostrar mais" soma mais 60)
   // Resposta do servidor para os filtros atuais: { total, pagina, paginas, itens, contagens, grupos, resumo }
   let DATA = { total: 0, pagina: 1, paginas: 1, itens: [], contagens: { lojas: {}, parceiros: 0, categorias: {}, categorias_total: 0, subcategorias: {} }, grupos: null, resumo: null };
   let carregou = false;
@@ -371,14 +372,16 @@
     });
   }, 1000);
 
-  function cardHtml(o) {
+  // pos: posição na página. As fotos dos 4 primeiros cartões aparecem sem rolar: carregam na hora (as 2 primeiras na frente)
+  function cardHtml(o, pos = 99) {
     const isSel = selected.has(o.id);
+    const carregar = pos < 4 ? `loading="eager"${pos < 2 ? ' fetchpriority="high"' : ''}` : 'loading="lazy"';
     const minerada = !o.loja_slug && o.fonte !== 'manual' && o.fonte !== 'empresa'; // preço conferido pela mineração
     // Anúncios criados pelas empresas abrem a página do anúncio; o resto vai direto para a loja.
     const link = o.fonte === 'empresa' ? `href="/anuncio/${o.id}"` : `href="/oferta/${slug(o)}" target="_blank" rel="noopener sponsored"`;
     return `<a class="card${isSel ? ' is-selected' : ''}" ${link} data-id="${o.id}">
       <div class="card-media">
-        <img src="/img/p/${o.id}.webp" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/images/pet-capi-head.png';this.style.opacity='.35'">
+        <img src="/img/p/${o.id}.webp" alt="" ${carregar} decoding="async" onerror="this.onerror=null;this.src='/images/pet-capi-head.png';this.style.opacity='.35'">
         ${relampagoHtml(o)}
         <div class="card-tags"><span class="card-off">-${Math.round(o.desconto_pct)}%</span>${Number(o.menor_preco_30d) === 1 ? '<span class="badge-low" title="Menor preço em 30 dias">Menor preço</span>' : ''}${comissaoHtml(o)}</div>
         <button class="card-select poster-only" type="button" data-select="${o.id}" aria-label="Escolher para postar"><svg><use href="#i-check"/></svg></button>
@@ -442,10 +445,20 @@
       $('#grid').innerHTML = `<div class="empty"><img src="/images/pet-capi.png" alt="" width="120"><h3>Nenhum cupom ativo${state.loja ? ' nesta loja' : ''} agora</h3><p>A lista é atualizada várias vezes por dia. Volte mais tarde.</p><button class="btn" type="button" data-clear>Ver as ofertas</button></div>`;
       return;
     }
+    const total = new Map();
+    for (const c of lista) total.set(c.loja, (total.get(c.loja) || 0) + 1);
+    const visiveis = lista.slice(0, cuponsVisiveis);
     const lojas = new Map();
-    for (const c of lista) { if (!lojas.has(c.loja)) lojas.set(c.loja, []); lojas.get(c.loja).push(c); }
-    $('#grid').innerHTML = [...lojas.entries()].map(([loja, itens]) => `<div class="group-title">${esc(loja)} <span>${itens.length} cupo${itens.length === 1 ? 'm' : 'ns'}</span></div>${itens.map(cupomHtml).join('')}`).join('');
+    for (const c of visiveis) { if (!lojas.has(c.loja)) lojas.set(c.loja, []); lojas.get(c.loja).push(c); }
+    const resto = lista.length - visiveis.length;
+    $('#grid').innerHTML = [...lojas.entries()].map(([loja, itens]) => `<div class="group-title">${esc(loja)} <span>${total.get(loja)} cupo${total.get(loja) === 1 ? 'm' : 'ns'}</span></div>${itens.map(cupomHtml).join('')}`).join('')
+      + (resto > 0 ? `<div class="cupons-mais"><button class="btn" type="button" data-mais-cupons>Mostrar mais cupons (${resto.toLocaleString('pt-BR')} restantes)</button></div>` : '');
   }
+  document.addEventListener('click', e => {
+    if (!e.target.closest('[data-mais-cupons]')) return;
+    cuponsVisiveis += 60;
+    renderCupons();
+  });
 
   function renderGrid() {
     $('#sort').hidden = Boolean(state.vista);
@@ -465,6 +478,7 @@
       const html = [];
       let lastKey = null;
       const groupCount = DATA.grupos || {};
+      let pos = 0;
       for (const o of pageItems) {
         const key = `${o.categoria}|${o.subcategoria}`;
         if (key !== lastKey) {
@@ -472,11 +486,11 @@
           html.push(`<div class="group-title">${esc(label)} <span>${groupCount[key]} oferta${groupCount[key] === 1 ? '' : 's'}</span></div>`);
           lastKey = key;
         }
-        html.push(cardHtml(o));
+        html.push(cardHtml(o, pos++));
       }
       $('#grid').innerHTML = html.join('');
     } else {
-      $('#grid').innerHTML = pageItems.map(cardHtml).join('');
+      $('#grid').innerHTML = pageItems.map((o, i) => cardHtml(o, i)).join('');
     }
     // Espaço de publicidade no meio da lista (depois da 8ª oferta da página)
     const cards = $('#grid').querySelectorAll('.card');

@@ -33,9 +33,9 @@ function documento({ titulo, descricao, corpo }) {
 <meta property="og:title" content="${h(titulo)} — Ofertou!"><meta property="og:description" content="${h(descricao)}"><meta property="og:image" content="/images/icon-512.png">
 <link rel="canonical" href="/cupons"><link rel="icon" href="/images/favicon-32x32.png">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=20261325">
-<script src="/js/tema.js?v=20261325"></script>
-<script src="/js/rodape-legal.js?v=20261325" defer></script>
+<link rel="stylesheet" href="/css/site.css?v=20261326">
+<script src="/js/tema.js?v=20261326"></script>
+<script src="/js/rodape-legal.js?v=20261326" defer></script>
 <style>
   body { background: var(--bg); }
   .cp-faixa { height: 3px; background: linear-gradient(90deg, #0a7a43, #0d6985 60%, #0b6bb5); }
