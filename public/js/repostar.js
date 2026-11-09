@@ -75,7 +75,7 @@
         <input type="text" id="rp-busca" placeholder="Buscar grupo" aria-label="Buscar grupo">
       </div>
       <p class="rp-contagem" id="rp-contagem"></p>
-      <p class="hint cli-hint" style="margin:0"><b>Origem</b>: o site pega as ofertas desse grupo. <b>Destino</b>: o site posta nesse grupo (só nos seus grupos).</p>
+      <p class="hint cli-hint" style="margin:0"><b>Origem</b>: o site pega as ofertas desse grupo. <b>Destino</b>: o site posta nesse grupo (só nos grupos em que o número é administrador).</p>
       <div class="rp-lista" id="rp-lista"></div>
     </div>
 
@@ -118,7 +118,7 @@
     const visiveis = lista.filter(g => !busca || g.nome.toLowerCase().includes(busca))
       .sort((a, b) => (papelDe(b.id) ? 1 : 0) - (papelDe(a.id) ? 1 : 0) || a.nome.localeCompare(b.nome, 'pt-BR'));
     $('rp-lista').innerHTML = visiveis.length ? visiveis.map(g => `<div class="rp-grupo" data-papel="${papelDe(g.id)}">
-        <span class="rp-gnome">${esc(g.nome)}<small>${g.meu ? 'Seu grupo' : 'Grupo de outra pessoa'}${Number.isInteger(g.membros) ? ` · ${g.membros} membros` : ''}</small></span>
+        <span class="rp-gnome">${esc(g.nome)}<small>${g.meu ? 'Número é administrador' : 'Grupo de outra pessoa'}${Number.isInteger(g.membros) ? ` · ${g.membros} membros` : ''}</small></span>
         <select data-rp-grupo="${esc(g.id)}" aria-label="Uso do grupo ${esc(g.nome)}">
           <option value="">Não usar</option>
           <option value="origem" ${papelDe(g.id) === 'origem' ? 'selected' : ''}>Origem</option>

@@ -2,7 +2,8 @@
 // Cada dono tem a própria conexão: o site ('site') e cada cliente da ferramenta ('c:<id>').
 //  • Conectar: o painel mostra o QR code; a sessão fica em data/ e volta sozinha ao religar o site.
 //  • Conversas: nome e foto dos contatos e dos grupos. Só as mensagens novas têm o texto guardado (30 dias); o histórico antigo não.
-//  • Grupos: por padrão, só os que este número criou e administra.
+//  • Grupos para postar: os que este número administra (criados por ele ou em que outra pessoa o fez administrador).
+//    As mensagens só ficam guardadas dos grupos que ele criou e administra.
 //  • Enviar: uma mensagem por vez, com pelo menos 3 segundos entre elas.
 // Não é a API oficial do WhatsApp: o número pode ser banido. A pasta da sessão dá acesso à conta: nunca copie nem compartilhe.
 const fs = require('fs');
@@ -361,13 +362,14 @@ class Conexao {
       const criador = [g.owner, g.ownerPn].some(x => x && eu.has(semAparelho(x)));
       return {
         id: g.id, nome: g.subject || g.id, membros: Number.isInteger(g.size) ? g.size : (participantes.length || null),
-        descricao: g.desc || null, so_admins_falam: Boolean(g.announce), admin, criador, meu: admin && criador,
+        // meu: pode postar (é administrador); guardado: as mensagens ficam salvas (criou e administra)
+        descricao: g.desc || null, so_admins_falam: Boolean(g.announce), admin, criador, meu: admin, guardado: admin && criador,
       };
     });
     lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     db.transaction(() => {
-      for (const g of lista) guardarContato(this.dono, g.id, { nome: g.nome, conversa: g.meu ? 1 : 0, meuGrupo: g.meu ? 1 : 0 });
-      for (const g of lista) if (!g.meu) db.run('UPDATE whatsapp_contatos SET meu_grupo = 0, conversa = 0 WHERE dono = ? AND jid = ?', this.dono, g.id);
+      for (const g of lista) guardarContato(this.dono, g.id, { nome: g.nome, conversa: g.guardado ? 1 : 0, meuGrupo: g.guardado ? 1 : 0 });
+      for (const g of lista) if (!g.guardado) db.run('UPDATE whatsapp_contatos SET meu_grupo = 0, conversa = 0 WHERE dono = ? AND jid = ?', this.dono, g.id);
     });
     this.grupos = { em: Date.now(), lista };
     return lista;
@@ -597,7 +599,7 @@ async function baixarMidia(dono, linha, maximo) {
   if (arquivo.length > maximo) throw falhou(`O arquivo passou de ${Math.round(maximo / 1048576)} MB.`, 413);
   return { base64: arquivo.toString('base64'), mimetype: info.mimetype || null, nome: info.fileName || null, tamanho: arquivo.length };
 }
-// Grupos: só os deste número (criados por ele e em que é administrador), a não ser que peça todos
+// Grupos: só os que este número administra (pode postar), a não ser que peça todos
 async function carregarGrupos(dono, { todos = false } = {}) {
   const lista = await conexao(dono).carregarGrupos();
   return todos ? lista : lista.filter(g => g.meu);

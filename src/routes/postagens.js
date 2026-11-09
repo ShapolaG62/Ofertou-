@@ -166,7 +166,7 @@ router.post('/api/postagens/publicar', async (req, res) => {
   }
 });
 
-// Grupos para escolher na tela de postagens: só os que este número criou e administra, com foto, nome e tipo
+// Grupos para escolher na tela de postagens: só os que este número administra, com foto, nome e tipo
 router.get('/api/postagens/meus-grupos', async (req, res) => {
   const whatsapp = require('../whatsapp');
   const temas = require('../temas-grupos');

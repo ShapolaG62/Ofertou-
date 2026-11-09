@@ -84,7 +84,7 @@ function dentroDoHorario(a) {
 }
 
 // Salva o que veio do painel. Os grupos são conferidos com o número conectado: destino só nos grupos deste número
-// (criados por ele e em que é administrador); origem em qualquer grupo em que ele esteja, menos os de destino.
+// (em que ele é administrador); origem em qualquer grupo em que ele esteja, menos os de destino.
 async function salvar(cid, corpo = {}) {
   const s = configDe(cid);
   const proprio = require('./whatsapp-proprio');
@@ -100,7 +100,7 @@ async function salvar(cid, corpo = {}) {
     const destinos = ids(corpo.destinos);
     const origens = ids(corpo.origens);
     const naoMeu = destinos.find(id => !porId.get(id)?.meu);
-    if (naoMeu) throw Object.assign(new Error('Grupo de destino precisa ser um grupo seu (criado por este número e com ele como administrador).'), { status: 400 });
+    if (naoMeu) throw Object.assign(new Error('Grupo de destino precisa ser um grupo em que este número é administrador.'), { status: 400 });
     const fora = origens.find(id => !porId.has(id));
     if (fora) throw Object.assign(new Error('Um dos grupos de origem não está mais neste número. Carregue os grupos de novo.'), { status: 400 });
     if (origens.some(id => destinos.includes(id))) throw Object.assign(new Error('Um grupo não pode ser origem e destino ao mesmo tempo.'), { status: 400 });

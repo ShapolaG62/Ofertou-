@@ -7,7 +7,7 @@ const social = require('./social');
 const falha = (msg, status = 400) => Object.assign(new Error(msg), { status });
 const cfgDe = cid => (cid ? require('./clientes').config(cid) : settings.getAll());
 
-// Confere os grupos pedidos: só os que este número criou e administra. Aceita ["id"] ou [{ id, nome }].
+// Confere os grupos pedidos: só os que este número administra. Aceita ["id"] ou [{ id, nome }].
 async function conferirGrupos(s, pedidos) {
   const meus = await whatsapp.listarGrupos(s);
   const porId = new Map(meus.map(g => [g.id, g]));

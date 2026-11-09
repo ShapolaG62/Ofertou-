@@ -14,7 +14,7 @@ async function status(s) {
   return { conectado: e.conectado, mensagem: e.conectado ? 'Número conectado.' : (e.erro || 'Número desconectado: clique em Conectar e leia o QR code.') };
 }
 
-// Grupos deste número: só os que ele criou e administra
+// Grupos deste número: os que ele administra (criados por ele ou não)
 const listarGrupos = s => proprio().carregarGrupos(donoDe(s));
 const resumoGrupos = s => proprio().resumoGrupos(donoDe(s));
 

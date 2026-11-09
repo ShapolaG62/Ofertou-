@@ -141,7 +141,7 @@ test('limite por hora', async () => {
 
 test('salvar: destino só nos meus grupos, sem repetir grupo, e ligar exige origem e destino', async () => {
   configurar({ repost_ativo: '0', repost_origens: '[]', repost_destinos: '[]' });
-  await assert.rejects(repostar.salvar(null, { origens: [DESTINO], destinos: [ORIGEM] }), /grupo seu/);
+  await assert.rejects(repostar.salvar(null, { origens: [DESTINO], destinos: [ORIGEM] }), /é administrador/);
   await assert.rejects(repostar.salvar(null, { origens: [DESTINO], destinos: [DESTINO] }), /origem e destino/);
   await assert.rejects(repostar.salvar(null, { ativo: true, origens: [ORIGEM], destinos: [] }), /pelo menos um grupo/);
   const p = await repostar.salvar(null, { ativo: true, origens: [ORIGEM, ORIGEM2], destinos: [DESTINO, DESTINO2], por_hora: 99, intervalo_min: 0, lojas: ['amazon', 'xyz'] });

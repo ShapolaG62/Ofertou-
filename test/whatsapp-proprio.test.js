@@ -97,14 +97,17 @@ test('QR code e conexão', async () => {
   assert.equal(whatsapp.config({}).tipo, 'proprio');
 });
 
-test('só vêm os grupos que o número criou e administra', async () => {
+test('vêm os grupos em que o número é administrador (criados por ele ou não)', async () => {
   const meus = await proprio.carregarGrupos(SITE);
-  assert.deepEqual(meus.map(g => g.nome), ['Criado com LID', 'Ofertas Tech']);
+  assert.deepEqual(meus.map(g => g.nome), ['Criado com LID', 'Ofertas Tech', 'Sou admin, mas outra pessoa criou']);
   assert.equal(meus.find(g => g.id === G1).membros, 42);
   const { ocultos } = await proprio.resumoGrupos(SITE);
-  assert.equal(ocultos, 3);
+  assert.equal(ocultos, 2);
+  // Mensagens guardadas: só dos grupos que o número criou e administra (Política de Privacidade)
+  assert.equal(db.get('SELECT meu_grupo FROM whatsapp_contatos WHERE dono = ? AND jid = ?', SITE, '120363000000000003@g.us').meu_grupo, 0);
+  assert.equal(db.get('SELECT meu_grupo FROM whatsapp_contatos WHERE dono = ? AND jid = ?', SITE, G1).meu_grupo, 1);
   assert.equal((await proprio.carregarGrupos(SITE, { todos: true })).length, 5, 'comunidade nunca entra');
-  assert.deepEqual((await whatsapp.listarGrupos({})).map(g => g.id).sort(), [G1, G2].sort());
+  assert.deepEqual((await whatsapp.listarGrupos({})).map(g => g.id).sort(), [G1, G2, '120363000000000003@g.us'].sort());
   // O total de membros é pedido também para grupo salvo antes
   assert.equal((await whatsapp.tamanhoGrupos({}, [G1])).get(G1), 42);
 });
