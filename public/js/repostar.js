@@ -1,5 +1,6 @@
 // Painéis do admin e do cliente → Repostar ofertas de outros grupos (src/repostar-grupos.js).
-// Escolhe os grupos de origem (de outras pessoas) e os de destino (os seus), os filtros, e mostra o que foi feito com cada oferta.
+// Escolhe os grupos de origem (de outras pessoas), de quais origens cada um dos "Grupos de destino" recebe, os filtros,
+// e mostra o que foi feito com cada oferta.
 (function () {
   const caixa = document.getElementById('repostar');
   if (!caixa) return;
@@ -9,8 +10,9 @@
   const SITUACAO = { postada: 'Postada', ignorada: 'Não postada', erro: 'Falhou' };
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let grupos = null;           // lista carregada do número
-  const escolha = new Map();   // id → 'origem' | 'destino'
+  const escolha = new Map();   // id → 'origem'
   const nomes = new Map();
+  const recebe = new Map();    // grupo de destino → Set das origens de que ele recebe
   let dados = null;
 
   async function pedir(caminho = '', opcoes = {}) {
@@ -39,7 +41,15 @@
     .rp-lista { margin-top: 10px; display: grid; gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 2px; }
     .rp-grupo { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line, var(--border)); border-radius: 10px; background: var(--surface-2); }
     .rp-grupo[data-papel=origem] { border-color: var(--blue, #2563eb); }
-    .rp-grupo[data-papel=destino] { border-color: var(--brand, var(--green)); }
+    .rp-dest { padding: 10px 12px; border: 1px solid var(--line, var(--border)); border-radius: 10px; background: var(--surface-2); }
+    .rp-dest[data-ok="1"] { border-color: var(--brand, var(--green)); }
+    .rp-dest > b { display: block; font-size: 14px; overflow-wrap: anywhere; }
+    .rp-dest > small { display: block; margin: 2px 0 8px; font-size: 12px; color: var(--ink-3, var(--muted)); }
+    .rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rp-chips label { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px; border: 1px solid var(--line-strong, var(--border-strong)); border-radius: 99px; font-size: 13px; cursor: pointer; overflow-wrap: anywhere; }
+    .rp-chips input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--brand, var(--green)); }
+    .rp-chips label:has(input:checked) { border-color: var(--brand, var(--green)); background: color-mix(in srgb, var(--brand, var(--green)) 14%, transparent); font-weight: 600; }
+    .rp-chips .rp-todas { border-style: dashed; }
     .rp-gnome { flex: 1; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
     .rp-gnome small { display: block; color: var(--ink-3, var(--muted)); font-size: 12px; }
     .rp-grupo select { flex: 0 0 auto; width: auto; max-width: 46%; }
@@ -75,8 +85,14 @@
         <input type="text" id="rp-busca" placeholder="Buscar grupo" aria-label="Buscar grupo">
       </div>
       <p class="rp-contagem" id="rp-contagem"></p>
-      <p class="hint cli-hint" style="margin:0"><b>Origem</b>: o site pega as ofertas desse grupo. <b>Destino</b>: o site posta nesse grupo (só nos grupos em que o número é administrador).</p>
+      <p class="hint cli-hint" style="margin:0">Marque como <b>Origem</b> os grupos de onde o site pega as ofertas.</p>
       <div class="rp-lista" id="rp-lista"></div>
+    </div>
+
+    <div class="rp-secao">
+      <h3>Para onde vai</h3>
+      <p class="hint cli-hint" style="margin:0 0 8px">Estes são os seus <b>Grupos de destino</b>. Em cada um, marque de quais grupos de origem ele recebe as ofertas.</p>
+      <div class="rp-lista" id="rp-destinos" style="max-height:none"></div>
     </div>
 
     <div class="rp-secao">
@@ -107,14 +123,39 @@
   const $ = id => document.getElementById(id);
 
   function papelDe(id) { return escolha.get(id) || ''; }
+  const origensEscolhidas = () => [...escolha.keys()];
+  const origensDe = id => [...(recebe.get(id) || [])].filter(o => escolha.has(o));
   function contar() {
-    const o = [...escolha.values()].filter(v => v === 'origem').length, d = [...escolha.values()].filter(v => v === 'destino').length;
+    const o = escolha.size, d = (dados?.grupos_destino || []).filter(g => origensDe(g.id).length).length;
     $('rp-contagem').textContent = `${o} grupo(s) de origem · ${d} grupo(s) de destino${grupos ? ` · ${grupos.length} grupo(s) no número` : ''}`;
   }
+  function desenharDestinos() {
+    const lista = dados?.grupos_destino || [];
+    const origens = origensEscolhidas();
+    $('rp-destinos').innerHTML = !lista.length
+      ? '<p class="hint cli-hint">Nenhum grupo de destino salvo. Marque os grupos em <b>Grupos de destino</b>, salve e volte aqui.</p>'
+      : lista.map(g => {
+        const marcadas = origensDe(g.id);
+        return `<div class="rp-dest" data-ok="${marcadas.length ? 1 : 0}"><b>${esc(g.nome)}</b>
+          <small>${!origens.length ? 'Escolha um grupo de origem acima.' : marcadas.length ? `Recebe de ${marcadas.length} grupo(s) de origem` : 'Não recebe repostagens'}</small>
+          ${origens.length ? `<div class="rp-chips">${origens.length > 1 ? `<label class="rp-todas"><input type="checkbox" data-rp-todas="${esc(g.id)}" ${marcadas.length === origens.length ? 'checked' : ''}> Todas</label>` : ''}${origens.map(o => `<label><input type="checkbox" data-rp-dest="${esc(g.id)}" value="${esc(o)}" ${marcadas.includes(o) ? 'checked' : ''}> ${esc(nomes.get(o) || o)}</label>`).join('')}</div>` : ''}
+        </div>`;
+      }).join('');
+    contar();
+  }
+  $('rp-destinos').addEventListener('change', e => {
+    const id = e.target.dataset.rpDest || e.target.dataset.rpTodas;
+    if (!id) return;
+    if (!recebe.has(id)) recebe.set(id, new Set());
+    const s = recebe.get(id);
+    if (e.target.dataset.rpTodas) { s.clear(); if (e.target.checked) origensEscolhidas().forEach(o => s.add(o)); }
+    else if (e.target.checked) s.add(e.target.value); else s.delete(e.target.value);
+    desenharDestinos();
+  });
   function desenharGrupos() {
     const busca = $('rp-busca').value.trim().toLowerCase();
     // Sem carregar: mostra só os já escolhidos
-    const lista = grupos || [...escolha.keys()].map(id => ({ id, nome: nomes.get(id) || id, meu: escolha.get(id) === 'destino', salvo: true }));
+    const lista = grupos || [...escolha.keys()].map(id => ({ id, nome: nomes.get(id) || id, salvo: true }));
     const visiveis = lista.filter(g => !busca || g.nome.toLowerCase().includes(busca))
       .sort((a, b) => (papelDe(b.id) ? 1 : 0) - (papelDe(a.id) ? 1 : 0) || a.nome.localeCompare(b.nome, 'pt-BR'));
     $('rp-lista').innerHTML = visiveis.length ? visiveis.map(g => `<div class="rp-grupo" data-papel="${papelDe(g.id)}">
@@ -122,7 +163,6 @@
         <select data-rp-grupo="${esc(g.id)}" aria-label="Uso do grupo ${esc(g.nome)}">
           <option value="">Não usar</option>
           <option value="origem" ${papelDe(g.id) === 'origem' ? 'selected' : ''}>Origem</option>
-          ${g.meu ? `<option value="destino" ${papelDe(g.id) === 'destino' ? 'selected' : ''}>Destino</option>` : ''}
         </select></div>`).join('')
       : `<p class="hint cli-hint">${grupos ? 'Nenhum grupo com esse nome.' : 'Clique em <b>Carregar grupos do número</b> para escolher.'}</p>`;
     contar();
@@ -132,7 +172,7 @@
     if (!id) return;
     if (e.target.value) escolha.set(id, e.target.value); else escolha.delete(id);
     e.target.closest('.rp-grupo').dataset.papel = e.target.value;
-    contar();
+    desenharDestinos();
   });
   $('rp-busca').addEventListener('input', desenharGrupos);
   $('rp-carregar').addEventListener('click', async () => {
@@ -140,8 +180,11 @@
     try {
       grupos = (await pedir('/grupos')).grupos;
       for (const g of grupos) nomes.set(g.id, g.nome);
-      $('rp-msg').textContent = `${grupos.length} grupo(s). Escolha a origem e o destino e clique em Salvar.`;
+      // Os Grupos de destino podem ter mudado depois que a tela abriu
+      try { const d = await pedir(); if (dados) dados.grupos_destino = d.grupos_destino; } catch { /* fica a lista de antes */ }
+      $('rp-msg').textContent = `${grupos.length} grupo(s). Escolha as origens, marque de quais origens cada grupo de destino recebe e clique em Salvar.`;
       desenharGrupos();
+      desenharDestinos();
     } catch (err) { $('rp-msg').textContent = err.message; }
   });
 
@@ -173,8 +216,11 @@
     $('rp-lojas').innerHTML = dados.lojas.map(id => `<label><input type="checkbox" value="${id}" ${a.lojas.includes(id) ? 'checked' : ''}> ${LOJAS[id]}${sem.has(id) ? ' <em>(sem link de afiliado)</em>' : ''}</label>`).join('');
     escolha.clear();
     for (const g of a.origens) { escolha.set(g.id, 'origem'); nomes.set(g.id, g.nome); }
-    for (const g of a.destinos) { escolha.set(g.id, 'destino'); nomes.set(g.id, g.nome); }
+    recebe.clear();
+    // Ajuste antigo sem origens marcadas: o destino recebia de todas
+    for (const g of a.destinos) recebe.set(g.id, new Set(g.origens || a.origens.map(o => o.id)));
     desenharGrupos();
+    desenharDestinos();
     desenharRegistro();
   }
   async function carregar() {
@@ -188,7 +234,8 @@
   $('rp-salvar').addEventListener('click', async () => {
     const ids = papel => [...escolha.entries()].filter(([, v]) => v === papel).map(([id]) => id);
     const corpo = {
-      ativo: $('rp-ativo').checked, origens: ids('origem'), destinos: ids('destino'), por_tipo: $('rp-tipo').checked,
+      ativo: $('rp-ativo').checked, origens: ids('origem'), por_tipo: $('rp-tipo').checked,
+      destinos: (dados?.grupos_destino || []).map(g => ({ id: g.id, origens: origensDe(g.id) })).filter(g => g.origens.length),
       desconto_min: $('rp-desconto').value, por_hora: $('rp-hora').value, intervalo_min: $('rp-intervalo').value,
       inicio: $('rp-inicio').value, fim: $('rp-fim').value,
       lojas: [...$('rp-lojas').querySelectorAll('input:checked')].map(i => i.value),

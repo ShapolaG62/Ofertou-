@@ -2,7 +2,8 @@
 // "grupos de origem" escolhidos no painel). Quando chega neles uma oferta com link de loja, o site:
 //  1. acha o produto (no site, pela API oficial da loja quando dá, ou pelos preços escritos na mensagem);
 //  2. limpa o link (sai o código de afiliado de quem postou) e aplica os filtros, a lista de palavras e a regra de repetição;
-//  3. confere o preço na loja (Mercado Livre e Shopee) e posta nos grupos de destino escolhidos, com o link de afiliado
+//  3. confere o preço na loja (Mercado Livre e Shopee) e posta nos grupos de destino que recebem daquela origem, com o link de afiliado.
+//     Os grupos de destino são os salvos em "Grupos de destino"; em cada um a pessoa marca de quais origens ele recebe.
 //     e o modelo de mensagem do dono. O texto e o cupom de quem postou não são copiados.
 // Uma postagem por vez, com intervalo mínimo e limite por hora. Nada das conversas desses grupos fica guardado: só o
 // registro do que foi feito com cada oferta (7 dias), para o painel.
@@ -53,7 +54,8 @@ function ajustes(s) {
   return {
     ativo: s.repost_ativo === '1',
     origens: lerLista(s.repost_origens),
-    destinos: lerLista(s.repost_destinos),
+    // origens: null = recebe de todas (ajuste antigo, salvo antes de dar para escolher)
+    destinos: lerLista(s.repost_destinos).map(g => ({ id: String(g.id), nome: g.nome, origens: Array.isArray(g.origens) ? g.origens.map(String) : null })),
     por_tipo: s.repost_por_tipo !== '0',
     por_hora: numero(s.repost_por_hora, 10, 1, 30),
     intervalo_min: numero(s.repost_intervalo_min, 3, 1, 120),
@@ -83,32 +85,47 @@ function dentroDoHorario(a) {
   return ini <= fim ? min >= ini && min < fim : min >= ini || min < fim;
 }
 
-// Salva o que veio do painel. Os grupos são conferidos com o número conectado: destino só nos grupos deste número
-// (em que ele é administrador); origem em qualquer grupo em que ele esteja, menos os de destino.
+// Grupos de destino da repostagem: os salvos em "Grupos de destino" (o número é administrador deles)
+const gruposDestino = s => require('./whatsapp').gruposEscolhidos(s).map(g => ({ id: String(g.id), nome: g.nome || String(g.id) }));
+
+// Salva o que veio do painel. Origem: qualquer grupo em que o número esteja (conferido com o número conectado).
+// Destino: um dos "Grupos de destino", com as origens de que ele recebe.
 async function salvar(cid, corpo = {}) {
   const s = configDe(cid);
   const proprio = require('./whatsapp-proprio');
   const dono = proprio.donoDe(cid);
   const valores = {};
-  const mesmos = (lista, salvos) => !(lista === undefined) && JSON.stringify([...new Set((Array.isArray(lista) ? lista : []).map(g => String(g?.id || g)))].sort())
-    === JSON.stringify(lerLista(salvos).map(g => g.id).sort());
-  const mudouGrupos = ('origens' in corpo && !mesmos(corpo.origens, s.repost_origens)) || ('destinos' in corpo && !mesmos(corpo.destinos, s.repost_destinos));
-  if (mudouGrupos) {
+  const ids = l => [...new Set((Array.isArray(l) ? l : []).map(g => String(g?.id || g)))];
+  let origens = lerLista(s.repost_origens).map(g => g.id);
+  if ('origens' in corpo && JSON.stringify(ids(corpo.origens).sort()) !== JSON.stringify([...origens].sort())) {
     const todos = await proprio.carregarGrupos(dono, { todos: true });
     const porId = new Map(todos.map(g => [g.id, g]));
-    const ids = l => [...new Set((Array.isArray(l) ? l : []).map(g => String(g?.id || g)))];
-    const destinos = ids(corpo.destinos);
-    const origens = ids(corpo.origens);
-    const naoMeu = destinos.find(id => !porId.get(id)?.meu);
-    if (naoMeu) throw Object.assign(new Error('Grupo de destino precisa ser um grupo em que este número é administrador.'), { status: 400 });
+    origens = ids(corpo.origens);
     const fora = origens.find(id => !porId.has(id));
     if (fora) throw Object.assign(new Error('Um dos grupos de origem não está mais neste número. Carregue os grupos de novo.'), { status: 400 });
-    if (origens.some(id => destinos.includes(id))) throw Object.assign(new Error('Um grupo não pode ser origem e destino ao mesmo tempo.'), { status: 400 });
-    const controle = String(s.wa_grupo_controle || '').trim();
-    if (controle && (origens.includes(controle) || destinos.includes(controle))) throw Object.assign(new Error('O grupo de automação não pode ser usado aqui.'), { status: 400 });
     if (origens.length > MAX_ORIGENS) throw Object.assign(new Error(`Escolha no máximo ${MAX_ORIGENS} grupos de origem.`), { status: 400 });
     valores.repost_origens = JSON.stringify(origens.map(id => ({ id, nome: porId.get(id).nome })));
-    valores.repost_destinos = JSON.stringify(destinos.map(id => ({ id, nome: porId.get(id).nome })));
+  }
+  const controle = String(s.wa_grupo_controle || '').trim();
+  if (controle && origens.includes(controle)) throw Object.assign(new Error('O grupo de automação não pode ser usado aqui.'), { status: 400 });
+  if ('destinos' in corpo || 'origens' in corpo) {
+    const validos = new Map(gruposDestino(s).map(g => [g.id, g]));
+    const pedidos = 'destinos' in corpo ? (Array.isArray(corpo.destinos) ? corpo.destinos : []) : ajustes(s).destinos;
+    const destinos = [];
+    for (const d of pedidos) {
+      const id = String(d?.id || '');
+      const g = validos.get(id);
+      if (!g) {
+        if (!('destinos' in corpo)) continue; // saiu de "Grupos de destino": deixa de receber
+        throw Object.assign(new Error('Um dos grupos de destino não está mais em "Grupos de destino". Atualize a página.'), { status: 400 });
+      }
+      // Origem que saiu da lista deixa de valer para o destino
+      const deQuais = d.origens === null ? null : ids(d.origens).filter(o => origens.includes(o));
+      if (deQuais && !deQuais.length) continue;
+      if (origens.includes(id)) throw Object.assign(new Error(`O grupo ${g.nome} não pode ser origem e destino ao mesmo tempo.`), { status: 400 });
+      if (!destinos.some(x => x.id === id)) destinos.push({ id, nome: g.nome, origens: deQuais });
+    }
+    valores.repost_destinos = JSON.stringify(destinos);
   }
   if ('ativo' in corpo) valores.repost_ativo = corpo.ativo ? '1' : '0';
   if ('por_tipo' in corpo) valores.repost_por_tipo = corpo.por_tipo ? '1' : '0';
@@ -123,7 +140,7 @@ async function salvar(cid, corpo = {}) {
   }
   const final = ajustes({ ...s, ...valores });
   if (final.ativo && (!final.origens.length || !final.destinos.length)) {
-    throw Object.assign(new Error('Para ligar, escolha pelo menos um grupo de origem e um grupo de destino.'), { status: 400 });
+    throw Object.assign(new Error('Para ligar, escolha pelo menos um grupo de origem e marque, em um grupo de destino, de qual origem ele recebe.'), { status: 400 });
   }
   if (cid) require('./clientes').salvarConfig(cid, valores);
   else for (const [k, v] of Object.entries(valores)) settings.set(k, v);
@@ -149,7 +166,7 @@ function painel(cid) {
   return {
     ajustes: a, registro, fila: (filas.get(chaveDono(cid)) || []).length,
     resumo: { postadas: hoje.postadas || 0, ignoradas: hoje.ignoradas || 0, erros: hoje.erros || 0, ultima_hora: postadasNaUltimaHora(cid) },
-    sem_afiliado: semAfiliado, lojas: LOJAS,
+    sem_afiliado: semAfiliado, lojas: LOJAS, grupos_destino: gruposDestino(s),
   };
 }
 const postadasNaUltimaHora = cid => db.get(`SELECT COUNT(*) AS n FROM repostar_registro WHERE cliente_id IS ? AND situacao = 'postada' AND created_at >= datetime('now', '-1 hour')`, cid ? Number(cid) : null).n;
@@ -296,7 +313,7 @@ function receber(cid, m) {
     const k = chaveDono(cid);
     if (!filas.has(k)) filas.set(k, []);
     const fila = filas.get(k);
-    fila.push({ urls, texto: String(m.texto).slice(0, 4000), bruta: m.bruta || null, origem: c.origens.get(m.chat), chegou: Date.now() });
+    fila.push({ urls, texto: String(m.texto).slice(0, 4000), bruta: m.bruta || null, origem: c.origens.get(m.chat), grupo: m.chat, chegou: Date.now() });
     while (fila.length > FILA_MAX) {
       const fora = fila.shift();
       registrar(cid, fora, { situacao: 'ignorada', motivo: 'Chegaram ofertas demais de uma vez: esta ficou de fora.' });
@@ -348,7 +365,11 @@ async function tratar(cid, item) {
 
   const whatsapp = require('./whatsapp');
   const social = require('./social');
-  const sDestino = whatsapp.comDestinos(s, a.destinos, a.por_tipo);
+  // Só os destinos que recebem desta origem e que ainda estão em "Grupos de destino"
+  const salvos = new Set(gruposDestino(s).map(g => g.id));
+  const destinos = a.destinos.filter(d => salvos.has(d.id) && (!d.origens || d.origens.includes(item.grupo)));
+  if (!destinos.length) return registrar(cid, item, { ...base, situacao: 'ignorada', motivo: 'Nenhum grupo de destino recebe ofertas deste grupo de origem.' });
+  const sDestino = whatsapp.comDestinos(s, destinos, a.por_tipo);
   if (!whatsapp.gruposDaOferta(sDestino, r.o.categoria, r.o.store_id).length) {
     return registrar(cid, item, { ...base, situacao: 'ignorada', motivo: 'Nenhum grupo de destino recebe ofertas deste tipo e desta loja.' });
   }

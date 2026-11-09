@@ -53,6 +53,7 @@ function configurar(extra = {}) {
   const valores = {
     site_url: '', amazon_tag: 'meutag-20', ml_matt_word: 'meu', ml_matt_tool: '123', magalu_store: '',
     repost_ativo: '1', repost_origens: JSON.stringify([{ id: ORIGEM, nome: 'Promoções da Ana' }, { id: ORIGEM2, nome: 'Achadinhos' }]),
+    whatsapp_groups: JSON.stringify([{ id: DESTINO, nome: 'Ofertou Tech' }, { id: DESTINO2, nome: 'Ofertou Casa' }]),
     repost_destinos: JSON.stringify([{ id: DESTINO, nome: 'Ofertou Tech' }]), repost_por_tipo: '0', repost_por_hora: '10',
     repost_intervalo_min: '1', repost_desconto_min: '15', repost_lojas: '', repost_inicio: '00:00', repost_fim: '23:59', ...extra,
   };
@@ -139,15 +140,21 @@ test('limite por hora', async () => {
   assert.match(registro().find(r => /B0REPOST06/.test(r.chave)).motivo, /Limite de 1 repostagens por hora/);
 });
 
-test('salvar: destino só nos meus grupos, sem repetir grupo, e ligar exige origem e destino', async () => {
+test('salvar: destino só nos Grupos de destino, com as origens de cada um, e ligar exige origem e destino', async () => {
   configurar({ repost_ativo: '0', repost_origens: '[]', repost_destinos: '[]' });
-  await assert.rejects(repostar.salvar(null, { origens: [DESTINO], destinos: [ORIGEM] }), /é administrador/);
-  await assert.rejects(repostar.salvar(null, { origens: [DESTINO], destinos: [DESTINO] }), /origem e destino/);
+  await assert.rejects(repostar.salvar(null, { origens: [ORIGEM], destinos: [{ id: ORIGEM2, origens: [ORIGEM] }] }), /Grupos de destino/);
+  await assert.rejects(repostar.salvar(null, { origens: [DESTINO], destinos: [{ id: DESTINO, origens: [DESTINO] }] }), /origem e destino/);
   await assert.rejects(repostar.salvar(null, { ativo: true, origens: [ORIGEM], destinos: [] }), /pelo menos um grupo/);
-  const p = await repostar.salvar(null, { ativo: true, origens: [ORIGEM, ORIGEM2], destinos: [DESTINO, DESTINO2], por_hora: 99, intervalo_min: 0, lojas: ['amazon', 'xyz'] });
+  await assert.rejects(repostar.salvar(null, { ativo: true, origens: [ORIGEM], destinos: [{ id: DESTINO, origens: [] }] }), /pelo menos um grupo/, 'destino sem origem marcada não conta');
+  const p = await repostar.salvar(null, { ativo: true, origens: [ORIGEM, ORIGEM2], destinos: [{ id: DESTINO, origens: [ORIGEM, ORIGEM2, 'outro@g.us'] }, { id: DESTINO2, origens: [ORIGEM2] }], por_hora: 99, intervalo_min: 0, lojas: ['amazon', 'xyz'] });
   assert.equal(p.ajustes.ativo, true);
   assert.deepEqual(p.ajustes.origens.map(g => g.nome), ['Promoções da Ana', 'Achadinhos']);
-  assert.deepEqual(p.ajustes.destinos.map(g => g.id), [DESTINO, DESTINO2]);
+  assert.deepEqual(p.ajustes.destinos.map(g => [g.id, g.origens]), [[DESTINO, [ORIGEM, ORIGEM2]], [DESTINO2, [ORIGEM2]]]);
+  assert.deepEqual(p.grupos_destino.map(g => g.id), [DESTINO, DESTINO2]);
+  // Tirar uma origem tira ela dos destinos
+  const sem = await repostar.salvar(null, { origens: [ORIGEM] });
+  assert.deepEqual(sem.ajustes.destinos.map(g => [g.id, g.origens]), [[DESTINO, [ORIGEM]]]);
+  await repostar.salvar(null, { origens: [ORIGEM, ORIGEM2], destinos: [{ id: DESTINO, origens: [ORIGEM, ORIGEM2] }, { id: DESTINO2, origens: [ORIGEM2] }] });
   assert.equal(p.ajustes.por_hora, 30, 'limite máximo');
   assert.equal(p.ajustes.intervalo_min, 1, 'intervalo mínimo');
   assert.deepEqual(p.ajustes.lojas, ['amazon']);
@@ -155,15 +162,28 @@ test('salvar: destino só nos meus grupos, sem repetir grupo, e ligar exige orig
   const carregar = proprio.carregarGrupos;
   proprio.carregarGrupos = async () => { throw new Error('desconectado'); };
   try {
-    const d = await repostar.salvar(null, { ativo: false, origens: [ORIGEM2, ORIGEM], destinos: [DESTINO, DESTINO2] });
+    const d = await repostar.salvar(null, { ativo: false, origens: [ORIGEM2, ORIGEM], destinos: [{ id: DESTINO, origens: [ORIGEM] }] });
     assert.equal(d.ajustes.ativo, false);
   } finally { proprio.carregarGrupos = carregar; }
+});
+
+test('cada grupo de destino recebe só das origens marcadas nele', async () => {
+  configurar({ repost_destinos: JSON.stringify([{ id: DESTINO, nome: 'Ofertou Tech', origens: [ORIGEM2] }, { id: DESTINO2, nome: 'Ofertou Casa', origens: [ORIGEM] }]) });
+  const antes = enviados.length;
+  repostar.receber(null, mensagem('Teclado Repostar Origem Certa\nDe R$ 200,00 Por R$ 100,00\nhttps://www.amazon.com.br/dp/B0REPOST08', ORIGEM));
+  await ate(() => registro().some(r => /B0REPOST08/.test(r.chave)));
+  assert.equal(registro().find(r => /B0REPOST08/.test(r.chave)).situacao, 'postada');
+  assert.deepEqual(enviados.slice(antes).map(e => e.destino), [DESTINO2]);
+  configurar({ repost_destinos: JSON.stringify([{ id: DESTINO, nome: 'Ofertou Tech', origens: [ORIGEM2] }]) });
+  repostar.receber(null, mensagem('Mousepad Repostar Sem Destino\nDe R$ 200,00 Por R$ 100,00\nhttps://www.amazon.com.br/dp/B0REPOST09', ORIGEM));
+  await ate(() => registro().some(r => /B0REPOST09/.test(r.chave)));
+  assert.match(registro().find(r => /B0REPOST09/.test(r.chave)).motivo, /deste grupo de origem/);
 });
 
 test('afiliado (cliente da ferramenta): usa a configuração e o link dele', async () => {
   const clientes = require('../src/clientes');
   const cid = clientes.criar({ nome: 'Afiliado Teste', email: 'afiliado-repostar@exemplo.test', senha: 'Senha-Forte-123!x', dias: 30 });
-  clientes.salvarConfig(cid, { amazon_tag: 'afiliado-20', repost_ativo: '1', repost_origens: JSON.stringify([{ id: ORIGEM, nome: 'Promoções da Ana' }]),
+  clientes.salvarConfig(cid, { amazon_tag: 'afiliado-20', whatsapp_groups: JSON.stringify([{ id: DESTINO2, nome: 'Ofertou Casa' }]), repost_ativo: '1', repost_origens: JSON.stringify([{ id: ORIGEM, nome: 'Promoções da Ana' }]),
     repost_destinos: JSON.stringify([{ id: DESTINO2, nome: 'Ofertou Casa' }]), repost_por_tipo: '0', repost_inicio: '00:00', repost_fim: '23:59' });
   repostar._paraTestes({ zerar: true });
   const antes = enviados.length;
