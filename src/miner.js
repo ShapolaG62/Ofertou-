@@ -6,6 +6,8 @@ const { STORES } = require('./stores');
 const { sleep } = require('./util');
 
 const DELAY_BETWEEN_QUERIES_MS = 2500;
+// Gravar uma oferta segura o servidor por alguns milissegundos: a cada 20, deixa o site atender quem está esperando
+const respirar = () => new Promise(r => setImmediate(r));
 
 let running = null;
 let runningSince = null; // quando a mineração em andamento começou (para a animação da Capi no site)
@@ -66,7 +68,8 @@ async function mineStore(store, terms, s, log, { varredura = false } = {}) {
       lastStatus = 'error';
       log(`[${store.name}] "${term.query}": erro ${result.message}`);
     }
-    for (const deal of result.deals) {
+    for (const [n, deal] of result.deals.entries()) {
+      if (n && n % 20 === 0) await respirar();
       found++;
       try {
         if (offers.saveDeal(store, deal, { settings: s, catHint: term.cat })) saved++;
@@ -81,7 +84,8 @@ async function mineStore(store, terms, s, log, { varredura = false } = {}) {
   if (varredura && typeof store.varredura === 'function' && !parar && lastStatus !== 'blocked') {
     try {
       const r = await store.varredura(s, { parar: () => parar });
-      for (const deal of r.deals) {
+      for (const [n, deal] of r.deals.entries()) {
+        if (n && n % 20 === 0) await respirar();
         found++;
         try { if (offers.saveDeal(store, deal, { settings: s })) saved++; } catch (err) { log(`[${store.name}] falha ao gravar: ${err.message}`); }
       }
@@ -112,7 +116,8 @@ async function minerarTermo(query) {
       const res = await Promise.race([store.search(query, s), espera]);
       if (res.status !== 'ok') return { encontradas: 0, gravadas: 0, falhou: 1 };
       let gravadas = 0;
-      for (const deal of res.deals) {
+      for (const [n, deal] of res.deals.entries()) {
+        if (n && n % 20 === 0) await respirar();
         try { if (offers.saveDeal(store, deal, { settings: s, catHint: cat })) gravadas++; } catch { /* oferta com problema: segue */ }
       }
       return { encontradas: res.deals.length, gravadas, falhou: 0 };

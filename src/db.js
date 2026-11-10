@@ -48,6 +48,9 @@ const USERS_COLUMNS = `
 db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
+  -- WAL + NORMAL: o banco não se corrompe nem se o programa cair; só uma queda de energia pode perder as últimas
+  -- gravações. Com FULL, cada oferta gravada esperava o disco (~2 ms), e a mineração travava o site por segundos.
+  PRAGMA synchronous = NORMAL;
 
   CREATE TABLE IF NOT EXISTS offers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -424,9 +427,20 @@ if (!db.prepare('PRAGMA table_info(clientes)').all().some(c => c.name === 'plano
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-const all = (sql, ...params) => db.prepare(sql).all(...params);
-const get = (sql, ...params) => db.prepare(sql).get(...params);
-const run = (sql, ...params) => db.prepare(sql).run(...params);
+// Consultas preparadas uma vez e reaproveitadas (preparar de novo a cada chamada custava tempo na mineração)
+const preparadas = new Map();
+function preparada(sql) {
+  let st = preparadas.get(sql);
+  if (!st) {
+    if (preparadas.size >= 800) preparadas.clear(); // consultas montadas na hora (listas IN de tamanhos variados)
+    st = db.prepare(sql);
+    preparadas.set(sql, st);
+  }
+  return st;
+}
+const all = (sql, ...params) => preparada(sql).all(...params);
+const get = (sql, ...params) => preparada(sql).get(...params);
+const run = (sql, ...params) => preparada(sql).run(...params);
 
 function transaction(fn) {
   db.exec('BEGIN');
