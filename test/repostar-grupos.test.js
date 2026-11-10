@@ -215,6 +215,31 @@ test('mensagem sem conteúdo, atrasada ou com link de fora: aparece no registro 
   assert.equal(ach.total, 1);
 });
 
+test('anúncio do Mercado Livre sem preço na mensagem: a extensão do Chrome lê e a oferta é repostada', async () => {
+  configurar();
+  const leitor = require('../src/leitor-ml');
+  leitor._paraTestes({ pausa: false, contato: Date.now() });
+  const antes = enviados.length;
+  repostar.receber(null, mensagem('🔥 OFERTA\nTênis Corrida Leve Repostar Extensão\n👉 https://produto.mercadolivre.com.br/MLB-5139556321-tenis-_JM?matt_word=outro'));
+  // A extensão pergunta pela fila, lê a página e devolve
+  await ate(() => leitor.pendentes().length || db.get(`SELECT 1 FROM ml_leituras WHERE item = 'MLB5139556321' AND entregue_em IS NOT NULL`));
+  assert.deepEqual(leitor.receber([{ item: 'MLB5139556321', produto: 'Tênis Vans Ultrarange Vr3 Neo', preco: 97.65, preco_anterior: 279,
+    imagem: 'https://http2.mlstatic.com/D_NQ_NP_123-O.jpg', disponivel: true }]), { lidos: 1 });
+  await ate(() => registro().some(r => r.chave === 'mercadolivre:MLB5139556321'));
+  const r = registro().find(x => x.chave === 'mercadolivre:MLB5139556321');
+  assert.equal(r.situacao, 'postada', r.motivo);
+  assert.equal(enviados.length, antes + 1);
+  assert.match(enviados.at(-1).texto, /97,65/);
+  // Extensão desligada e mensagem sem preço: avisa o que fazer
+  leitor._paraTestes({ contato: 0 });
+  repostar.receber(null, mensagem('Camisa Polo Repostar Sem Extensão\nhttps://produto.mercadolivre.com.br/MLB-4119206697-camisa-_JM', ORIGEM2));
+  await ate(() => registro().some(x => x.chave === 'mercadolivre:MLB4119206697'));
+  assert.match(registro().find(x => x.chave === 'mercadolivre:MLB4119206697').motivo, /Chrome aberto com a extensão/);
+  // Só a extensão com a chave certa fala com a fila
+  assert.equal(leitor.chaveConfere('errada'), false);
+  assert.equal(leitor.chaveConfere(leitor.chave()), true);
+});
+
 test('afiliado (cliente da ferramenta): usa a configuração e o link dele', async () => {
   const clientes = require('../src/clientes');
   const cid = clientes.criar({ nome: 'Afiliado Teste', email: 'afiliado-repostar@exemplo.test', senha: 'Senha-Forte-123!x', dias: 30 });
@@ -230,4 +255,16 @@ test('afiliado (cliente da ferramenta): usa a configuração e o link dele', asy
   assert.equal(enviados.at(-1).destino, DESTINO2);
   assert.match(enviados.at(-1).texto, /tag=afiliado-20/);
   assert.doesNotMatch(enviados.at(-1).texto, /meutag-20|outro-20/);
+});
+
+test('lê os preços nos formatos comuns dos grupos de ofertas', () => {
+  const { lerOfertaDoTexto: ler } = require('../src/grupo-automacao');
+  const v = t => { const r = ler(t); return [r.titulo, r.anterior, r.atual]; };
+  assert.deepEqual(v('🔥 OFERTA RELÂMPAGO 🔥\n\nMouse Gamer Logitech G203 Lightsync\n~R$ 199~\n✅ R$ 99\n👉 https://x'), ['Mouse Gamer Logitech G203 Lightsync', 199, 99]);
+  assert.deepEqual(v('Kit 3 Camisetas Básicas Algodão\nPor apenas 59,90\nEra 119,90\nhttps://x'), ['Kit 3 Camisetas Básicas Algodão', 119.9, 59.9]);
+  assert.deepEqual(v('Placa-mãe MSI A520M-A Pro\nDe: R$499 Por: R$379\nCupom: TECH10 (R$ 10 OFF)\nFrete grátis acima de R$ 79'), ['Placa-mãe MSI A520M-A Pro', 499, 379]);
+  const tv = ler('Smart TV 50" Samsung 4K UHD\nR$ 2.199,00 à vista\nou 10x de R$ 239,90 sem juros\n-21%');
+  assert.equal(tv.atual, 2199);
+  assert.ok(Math.abs(tv.anterior - 2783.54) < 0.01, 'o preço "de" sai do desconto, sem contar a parcela');
+  assert.deepEqual(v('Air Fryer Mondial 4L\n💸 R$ 289,90'), ['Air Fryer Mondial 4L', null, 289.9]);
 });

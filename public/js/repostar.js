@@ -119,6 +119,7 @@
       <div class="rp-topo"><h3 style="margin:0">Últimas 24 horas</h3><button class="btn small" type="button" id="rp-atualizar">Atualizar</button></div>
       <div class="rp-resumo" id="rp-resumo" style="margin-top:8px"></div>
       <p class="hint cli-hint" id="rp-recebidas" style="margin:10px 0 0"></p>
+      <p class="hint cli-hint" id="rp-leitor" style="margin:6px 0 0"></p>
       <div class="rp-reg" id="rp-registro"></div>
     </div>`;
   const $ = id => document.getElementById(id);
@@ -196,6 +197,10 @@
   function desenharRegistro() {
     const r = dados.resumo;
     const rec = dados.recebidas || [];
+    const lm = dados.leitor_ml;
+    $('rp-leitor').innerHTML = lm ? (lm.ativa
+      ? '✅ <b>Leitor do Mercado Livre ligado</b>: a extensão do Chrome lê os anúncios do Mercado Livre que o site não consegue ler.'
+      : '⚠️ <b>Leitor do Mercado Livre desligado</b>: deixe o Chrome aberto com a extensão Ofertou! (versão 2.16 ou mais nova) e abra o Painel uma vez. Sem ela, anúncios do Mercado Livre só entram quando a mensagem traz os preços.') : '';
     $('rp-recebidas').innerHTML = rec.length ? `<b>Mensagens recebidas dos grupos de origem</b> (desde a última vez que o site ligou): ${rec.map(g => `${esc(g.nome)}: ${g.total}${g.ilegiveis ? ` (+${g.ilegiveis} sem conteúdo)` : ''}${g.ultima ? `, a última às ${new Date(g.ultima).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`).join(' · ')}` : '';
     $('rp-resumo').innerHTML = [
       [r.postadas, 'postadas'], [r.ignoradas, 'não postadas'], [r.erros, 'falharam'], [`${r.ultima_hora}/${dados.ajustes.por_hora}`, 'na última hora'],
@@ -230,7 +235,7 @@
     try { dados = await pedir(); preencher(); } catch (err) { $('rp-msg').textContent = err.message; }
   }
   async function atualizarRegistro() {
-    try { const d = await pedir(); dados.registro = d.registro; dados.resumo = d.resumo; dados.recebidas = d.recebidas; desenharRegistro(); } catch { /* tenta de novo depois */ }
+    try { const d = await pedir(); dados.registro = d.registro; dados.resumo = d.resumo; dados.recebidas = d.recebidas; dados.leitor_ml = d.leitor_ml; desenharRegistro(); } catch { /* tenta de novo depois */ }
   }
   $('rp-atualizar').addEventListener('click', atualizarRegistro);
   $('rp-ativo').addEventListener('change', () => { $('rp-ativo-txt').textContent = $('rp-ativo').checked ? 'Ligado (salve para valer)' : 'Desligado (salve para valer)'; });

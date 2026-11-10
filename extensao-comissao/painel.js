@@ -6,6 +6,14 @@
   const ORIGEM = location.origin;
   chrome.storage.local.set({ painel: ORIGEM, soGanhoCliente: false }); // endereço do Painel, para voltar depois de buscar
 
+  // Leitor do Mercado Livre: a chave para a extensão falar com o site (só o administrador logado recebe)
+  if (window === window.top) {
+    fetch('/api/admin/extensao/leitor', { cache: 'no-store', credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.chave) chrome.storage.local.set({ leitorChave: d.chave, leitorSite: ORIGEM }); })
+      .catch(() => {});
+  }
+
   const VERSAO = chrome.runtime.getManifest().version;
   const avisar = msg => window.postMessage({ ofertouExt: true, ...(msg.tipo === 'instalada' ? { versao: VERSAO } : {}), ...msg }, ORIGEM);
   avisar({ tipo: 'instalada' });

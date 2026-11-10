@@ -129,3 +129,56 @@ chrome.runtime.onMessage.addListener((m, sender, responder) => {
     .finally(() => clearTimeout(relogio));
   return true;
 });
+
+// ── Leitor do Mercado Livre para o site (repostagem de ofertas de outros grupos) ──
+// O Mercado Livre não deixa o servidor do site ler anúncios; aqui, no seu Chrome, a página abre normalmente.
+// A cada minuto pergunta ao site se há anúncios para ler, lê a página de cada um (com pausa entre eles) e devolve
+// nome, foto e preços. Só lê; se o Mercado Livre pedir login ou verificação, para e tenta no minuto seguinte.
+const ALARME_LEITOR = 'ofertou-leitor-ml';
+const entidades = s => String(s || '').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+const numeroBr = s => { const n = Number(String(s).replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+
+function anuncioDaPagina(html) {
+  const meta = p => entidades((new RegExp(`<meta property="${p}" content="([^"]*)"`).exec(html) || [])[1] || '');
+  const titulo = meta('og:title');
+  // og:title: "Nome do produto - R$ 47,53" (o preço atual da página)
+  const precoTitulo = /\s-\s*R\$\s*([\d.]+(?:,\d{1,2})?)\s*$/.exec(titulo);
+  const produto = titulo.replace(/\s-\s*R\$\s*[\d.,]+\s*$/, '').trim();
+  const preco = precoTitulo ? numeroBr(precoTitulo[1]) : Number((/"price":\s*([\d.]+)/.exec(html) || [])[1]) || null;
+  // Preço riscado: "Antes: 1.340 reais com 50 centavos"
+  const antes = /andes-money-amount--previous[^>]*aria-label="Antes:\s*([\d.]+)\s*reais(?:\s*com\s*(\d{1,2})\s*centavos?)?/i.exec(html);
+  let anterior = antes ? numeroBr(antes[1]) + (antes[2] ? Number(antes[2]) / 100 : 0) : null;
+  if (!anterior) anterior = Number((/"original_price":\s*([\d.]+)/.exec(html) || [])[1]) || null;
+  const esgotado = /"availability":"[^"]*OutOfStock/i.test(html) || /Anúncio pausado|Este anúncio foi finalizado|Estoque esgotado/i.test(html);
+  return { produto, preco, preco_anterior: anterior, imagem: meta('og:image') || null, disponivel: !esgotado };
+}
+
+async function lerFilaDoSite() {
+  const { leitorChave: chave, leitorSite: site } = await chrome.storage.local.get(['leitorChave', 'leitorSite']);
+  if (!chave || !site) return;
+  const cab = { 'X-Ofertou-Chave': chave };
+  const r = await fetch(`${site}/api/extensao/ml-pendentes`, { headers: cab, cache: 'no-store' });
+  if (!r.ok) return;
+  const { itens = [] } = await r.json();
+  const lidos = [];
+  for (const it of itens.slice(0, 8)) {
+    let url;
+    try { url = new URL(it.url); } catch { continue; }
+    if (url.protocol !== 'https:' || !/(^|\.)mercadolivre\.com\.br$/.test(url.hostname)) continue;
+    try { lidos.push({ item: it.item, ...anuncioDaPagina(await buscar(url.href)) }); } catch (err) {
+      lidos.push({ item: it.item, erro: String(err?.message || err).slice(0, 200) });
+      if (/login|verificação/.test(String(err?.message))) break; // o Mercado Livre pediu verificação: para por agora
+    }
+    await espera(1500);
+  }
+  if (lidos.length) {
+    await fetch(`${site}/api/extensao/ml-lidos`, { method: 'POST', headers: { ...cab, 'Content-Type': 'application/json' }, body: JSON.stringify({ itens: lidos }) });
+  }
+}
+
+const ligarLeitor = () => chrome.alarms.create(ALARME_LEITOR, { periodInMinutes: 1 });
+chrome.runtime.onInstalled.addListener(ligarLeitor);
+chrome.runtime.onStartup.addListener(ligarLeitor);
+chrome.alarms.onAlarm.addListener(a => { if (a.name === ALARME_LEITOR) lerFilaDoSite().catch(() => {}); });
+// O Painel acabou de entregar a chave: lê a fila na hora, sem esperar o minuto
+chrome.storage.onChanged.addListener(m => { if (m.leitorChave) { ligarLeitor(); lerFilaDoSite().catch(() => {}); } });

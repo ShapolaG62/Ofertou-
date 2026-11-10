@@ -315,6 +315,13 @@ app.use('/uploads', express.static(UPLOADS_DIR, {
   },
 }));
 
+// Leitor do Mercado Livre pela extensão do Chrome (src/leitor-ml.js): autenticado pela chave da extensão
+{
+  const leitor = require('./src/leitor-ml');
+  const comChave = (req, res, next) => (leitor.chaveConfere(req.get('x-ofertou-chave')) ? next() : res.status(401).json({ error: 'Chave da extensão inválida.' }));
+  app.get('/api/extensao/ml-pendentes', comChave, (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ itens: leitor.pendentes() }); });
+  app.post('/api/extensao/ml-lidos', comChave, (req, res) => res.json(leitor.receber(req.body?.itens)));
+}
 app.use(publicRoutes);
 app.use(adminRoutes);
 app.use(contaRoutes);

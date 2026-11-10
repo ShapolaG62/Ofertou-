@@ -170,7 +170,7 @@ function painel(cid) {
   return {
     ajustes: a, registro, fila: (filas.get(chaveDono(cid)) || []).length,
     resumo: { postadas: hoje.postadas || 0, ignoradas: hoje.ignoradas || 0, erros: hoje.erros || 0, ultima_hora: postadasNaUltimaHora(cid) },
-    sem_afiliado: semAfiliado, lojas: LOJAS, grupos_destino: gruposDestino(s),
+    sem_afiliado: semAfiliado, lojas: LOJAS, grupos_destino: gruposDestino(s), leitor_ml: require('./leitor-ml').estado(),
     // O que chegou de cada grupo de origem desde que o site ligou (mostra se o número está recebendo as mensagens)
     recebidas: a.origens.map(g => ({ id: g.id, nome: g.nome, ...(vistas.get(`${chaveDono(cid)}|${g.id}`) || { total: 0, ilegiveis: 0, ultima: null }) })),
   };
@@ -302,7 +302,25 @@ async function ofertaDaMensagem(cid, item) {
   }
   // Sem API da loja: usa o nome e os preços escritos na mensagem (o preço é conferido de novo antes de postar, quando dá)
   const lido = require('./grupo-automacao').lerOfertaDoTexto(item.texto);
-  if (!lido.titulo || !lido.anterior || !lido.atual || lido.anterior <= lido.atual) {
+  const textoCompleto = lido.titulo && lido.anterior && lido.atual && lido.anterior > lido.atual;
+  // Mercado Livre: o servidor não consegue ler o anúncio (a API nega e a página pede verificação). A extensão do Chrome
+  // do administrador lê a página e devolve nome, foto e preços (src/leitor-ml.js).
+  if (!textoCompleto && store.id === 'mercadolivre' && pid) {
+    const leitor = require('./leitor-ml');
+    const ml = await leitor.aguardar(pid, limpo);
+    if (ml?.disponivel === false) return { erro: 'O Mercado Livre informou que o anúncio não está mais disponível.', store, chave };
+    if (ml?.preco && ml.preco_anterior > ml.preco) {
+      const id = offers.saveDeal(store, { store_product_id: pid, produto: ml.produto, preco_atual: ml.preco, preco_anterior: ml.preco_anterior,
+        imagem: ml.imagem, original_url: limpo }, { fonte: 'auto' });
+      if (!id) return { erro: 'No Mercado Livre, o desconto está fora da faixa aceita ou o produto tem palavra proibida.', store, chave };
+      return { o: db.get('SELECT * FROM offers WHERE id = ?', id), store, chave, conferida: true };
+    }
+    if (ml?.preco) return { erro: 'No Mercado Livre, o anúncio está sem preço riscado (sem desconto).', store, chave };
+    return { erro: leitor.ativa()
+      ? 'A extensão do Chrome não conseguiu ler este anúncio do Mercado Livre a tempo, e a mensagem não traz os preços.'
+      : 'Para ler anúncios do Mercado Livre, deixe o Chrome aberto com a extensão Ofertou! (o Mercado Livre não deixa o servidor ler). A mensagem também não traz os preços.', store, chave };
+  }
+  if (!textoCompleto) {
     return { erro: 'A mensagem não traz o nome e os preços "De R$ … Por R$ …" e o produto não está no site.', store, chave };
   }
   const expira = sqlAgora(Date.now() + 86400000);
@@ -321,7 +339,8 @@ function barrar(cid, s, a, o) {
   if (Number(o.desconto_pct) < a.desconto_min) return `Desconto de ${Math.round(o.desconto_pct)}%, abaixo do mínimo de ${a.desconto_min}%.`;
   if (require('./palavras-proibidas').bloqueia(o.produto)) return 'O produto tem uma palavra da lista de proibidas.';
   const agenda = require('./agenda');
-  if (!agenda.filtroDoDono({ ...s, agenda_lojas: '' })(o)) return 'O produto bateu nas palavras bloqueadas (ou não tem as obrigatórias) do agendamento.';
+  // Só as palavras bloqueadas valem aqui; a lista de palavras permitidas é do agendamento (ela barrava quase tudo)
+  if (!agenda.filtroDoDono({ ...s, agenda_lojas: '', agenda_palavras_permitidas: '' })(o)) return 'O produto tem uma das palavras bloqueadas do agendamento.';
   const rep = agenda.regraDeRepeticao(cid);
   if (rep.porOferta(o) || rep.porProduto(o)) return 'Este produto já foi postado nos últimos 7 dias e o preço não caiu 10%.';
   return null;
@@ -466,6 +485,7 @@ async function tratar(cid, item) {
 
 function iniciar() {
   limpar();
+  require('./leitor-ml').limpar();
   setInterval(limpar, 6 * 3600000).unref?.();
 }
 

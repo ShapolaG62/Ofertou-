@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Ofertou! Mercado Livre",
   "short_name": "Ofertou ML",
-  "version": "2.15.0",
-  "description": "Leva do Mercado Livre para o Ofertou! as ofertas relâmpago, os cupons, os produtos com comissão extra, além do saldo e das vendas de afiliado do Mercado Livre e da Magalu, sem copiar e colar.",
+  "version": "2.16.0",
+  "description": "Lê para o Ofertou! os anúncios do Mercado Livre da repostagem e leva as ofertas relâmpago, os cupons, os produtos com comissão extra, além do saldo e das vendas de afiliado do Mercado Livre e da Magalu, sem copiar e colar.",
   "icons": {
     "16": "icone.png",
     "48": "icone.png",
@@ -11,11 +11,15 @@
   },
   "permissions": [
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "alarms"
   ],
   "host_permissions": [
     "https://lista.mercadolivre.com.br/*",
     "https://www.mercadolivre.com.br/*",
+    "https://produto.mercadolivre.com.br/*",
+    "https://tanoofertou.com.br/*",
+    "https://www.tanoofertou.com.br/*",
     "https://rochelle.magazinevoce.com.br/*"
   ],
   "background": {

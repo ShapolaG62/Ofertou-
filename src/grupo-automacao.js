@@ -29,15 +29,37 @@ Mande aqui e eu cuido do resto:
 
 const PRECO = v => { const n = Number(String(v || '').replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
 // Lê título e preços de uma oferta encaminhada ("De R$ 229,99 ❌ / Por: R$ 126,75 🔥")
-function lerOfertaDoTexto(texto) {
-  const linhas = String(texto).split('\n').map(l => l.replace(/[*_~]/g, '').trim()).filter(Boolean);
-  const de = /\bde:?\s*r\$\s*([\d.]+,\d{2}|[\d.]+)/i.exec(texto);
-  const por = /\bpor:?\s*r\$\s*([\d.]+,\d{2}|[\d.]+)/i.exec(texto);
-  const todos = [...String(texto).matchAll(/r\$\s*([\d.]+,\d{2})/gi)].map(m => PRECO(m[1])).filter(Boolean);
+// Os grupos de ofertas escrevem o preço de muitos jeitos: "De R$ 199,90 Por R$ 99,90", "~R$ 199~ R$ 99", "R$99",
+// "Por 99,90", "R$ 99,90 (40% OFF)"... Ignora parcelas ("10x de R$ 9,90"), frete e valor do cupom.
+const NUM = '(\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?|\\d+(?:,\\d{1,2})?)';
+function precosDoTexto(texto) {
+  const t = String(texto).replace(/[*_~]/g, ' ');
+  const linhas = t.split('\n').filter(l => !/\bfrete\b|\bcupom\b.*\b(off|desconto)\b|\b(off|desconto)\b.*\bcupom\b|\bcashback\b/i.test(l) || /\b(de|por)\b/i.test(l));
+  const limpo = linhas.join('\n').replace(new RegExp(`\\d+\\s*x\\s*(?:de\\s*)?(?:r\\$\\s*)?${NUM}(?:\\s*sem juros)?`, 'gi'), ' ');
+  const de = new RegExp(`\\b(?:de|era)\\s*:?\\s*(?:r\\$\\s*)?${NUM}`, 'i').exec(limpo);
+  const por = new RegExp(`\\b(?:por|agora|apenas|sai por)\\s*:?\\s*(?:apenas\\s*)?(?:r\\$\\s*)?${NUM}`, 'i').exec(limpo);
+  const todos = [...limpo.matchAll(new RegExp(`r\\$\\s*${NUM}`, 'gi'))].map(m => PRECO(m[1])).filter(Boolean);
+  const pct = /(?:-\s*)?(\d{1,2})\s*%\s*(?:off|de desconto|desc)?/i.exec(limpo);
   let anterior = de ? PRECO(de[1]) : null, atual = por ? PRECO(por[1]) : null;
   if ((!anterior || !atual) && todos.length >= 2) { anterior = Math.max(...todos); atual = Math.min(...todos); }
-  const titulo = linhas.find(l => !/https?:\/\//i.test(l) && !/r\$/i.test(l) && !/^(de|por|cupom|use o cupom|compre|link|⚠)/i.test(semAcento(l).replace(/^[^a-z0-9]+/, ''))
-    && /[a-z]{3,}/i.test(semAcento(l)) && l.length >= 8);
+  if (!atual && todos.length === 1) atual = todos[0];
+  // Um preço só, com o desconto escrito: o preço "de" sai da conta
+  if (atual && (!anterior || anterior <= atual) && pct && Number(pct[1]) >= 3 && Number(pct[1]) <= 90) {
+    anterior = Math.round((atual / (1 - Number(pct[1]) / 100)) * 100) / 100;
+  }
+  return { anterior, atual };
+}
+
+function lerOfertaDoTexto(texto) {
+  const linhas = String(texto).split('\n').map(l => l.replace(/[*_~]/g, '').trim()).filter(Boolean);
+  const { anterior, atual } = precosDoTexto(texto);
+  // Chamadas do grupo ("🔥 OFERTA RELÂMPAGO", "BAIXOU!", "Corre!") não são o nome do produto
+  const CHAMADA = /^(oferta|ofertas|promo|promocao|baixou|corre|achad|imperdivel|urgente|bug|relampago|alerta|olha|vem|aproveita|preco|menor preco|so hoje|hoje|link|compre|cupom|use o cupom|de|por|frete|parcel|vendido|loja|⚠)/;
+  const candidatas = linhas.filter(l => {
+    const t = semAcento(l).replace(/^[^a-z0-9]+/, '');
+    return !/https?:\/\//i.test(l) && !/r\$/i.test(l) && !/\d+\s*%/.test(l) && !CHAMADA.test(t) && /[a-z]{3,}/i.test(t) && l.length >= 8;
+  });
+  const titulo = candidatas.find(l => l.trim().split(/\s+/).length >= 3) || candidatas[0];
   return { titulo: titulo ? titulo.replace(/^[^\p{L}\p{N}]+/u, '').slice(0, 200) : null, anterior, atual };
 }
 

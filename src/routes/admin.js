@@ -116,6 +116,9 @@ router.post('/api/admin/2fa/desligar', (req, res) => {
 // ── Configurações ─────────────────────────────────────────────────────────────
 router.get('/api/admin/settings', (req, res) => res.json(settings.getForAdmin()));
 
+// Chave da extensão do Chrome para o leitor do Mercado Livre (o Painel entrega à extensão)
+router.get('/api/admin/extensao/leitor', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ chave: require('../leitor-ml').chave(), ...require('../leitor-ml').estado() }); });
+
 router.put('/api/admin/settings', (req, res) => {
   const changed = settings.updateFromAdmin(req.body);
   const affiliateKeys = ['amazon_tag', 'ml_matt_word', 'ml_matt_tool', 'magalu_store', 'kabum_afiliado', 'shopee_afiliado_id'];
