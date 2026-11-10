@@ -432,5 +432,6 @@
       else window.OfertouApp.telaAssinatura(params.get('plano') || '');
     }).catch(() => window.OfertouApp.telaAssinatura(params.get('plano') || ''));
   } else if (params.get('pedido')) acompanhar(params.get('pedido'));
-  else iniciarForm(params.get('plano') || '').catch(() => show('erro'));
+  else if (!params.get('plano')) location.replace('/conta#planos');
+  else iniciarForm(params.get('plano')).catch(() => show('erro'));
 })();

@@ -3179,7 +3179,9 @@ body:has(.cli-login:not([hidden])) .cli-login { background: var(--surface); bord
   body.is-landing .lp-hero { grid-template-columns: minmax(0, 1fr); padding: 22px 0 28px; gap: 18px; }
   .is-landing .lp-hero h1 { font-size: 30px; margin: 12px 0 10px; }
   .is-landing .lp-lead { font-size: 15px; margin-bottom: 0; }
-  .is-landing .lp-hero .lp-cta, .is-landing .lp-hero .lp-stats, .is-landing .lp-fotos { display: none; }
+  /* No celular o login fica logo abaixo: do topo só sai o "Como funciona"; o caminho para os planos continua */
+  .is-landing .lp-hero .lp-cta .btn:not(.btn-primary), .is-landing .lp-hero .lp-stats, .is-landing .lp-fotos { display: none; }
+  .is-landing .lp-hero .lp-cta { margin-top: 14px; }
 }
 
 /* ── Painel do afiliado em tela cheia: menu lateral de altura inteira e busca na barra do topo ── */
@@ -3681,3 +3683,7 @@ body .tabs-line:not(.cli-nav) button[aria-selected="true"] { background: var(--a
 
 /* Cupons: botão "Mostrar mais" ocupa a linha inteira da grade */
 .cupons-mais { grid-column: 1 / -1; display: flex; justify-content: center; padding: 8px 0 4px; }
+
+/* Página de venda: chamada para afiliados logo no topo */
+.lp-afiliado { margin: 12px 0 0; font-size: 14.5px; color: var(--ink-2); }
+.lp-afiliado a { font-weight: 700; color: var(--brand); }

@@ -276,7 +276,7 @@ app.get('/robots.txt', (req, res) => {
 app.get('/sitemap.xml', (req, res) => {
   const base = String(require('./src/settings').get('site_url') || '').replace(/\/+$/, '') || baseUrl(req);
   const hoje = new Date().toISOString().slice(0, 10);
-  const urls = [['/', 'hourly', '1.0'], ['/conta', 'weekly', '0.8'], ['/ajuda', 'monthly', '0.6'], ['/anuncie', 'monthly', '0.5'], ['/ferramenta', 'weekly', '0.7'], ['/assinar', 'monthly', '0.5'], ['/privacidade', 'yearly', '0.3']]
+  const urls = [['/', 'hourly', '1.0'], ['/conta', 'weekly', '0.8'], ['/ajuda', 'monthly', '0.6'], ['/anuncie', 'monthly', '0.5'], ['/ferramenta', 'weekly', '0.7'], ['/privacidade', 'yearly', '0.3']]
     .map(([p, freq, pri]) => ({ loc: base + p, freq, pri }));
   try {
     const lojas = require('./src/db').all(`SELECT lj.slug FROM lojas lj JOIN users u ON u.id = lj.user_id
