@@ -38,6 +38,8 @@ whatsapp.fotoParaEnvio = async () => Buffer.from('foto-da-loja');
 const enviados = [];
 whatsapp.enviar = async (_s, destino, msg) => { enviados.push({ destino, ...msg }); return 'id'; };
 social.ajustes.pausaEntreGrupos = false;
+// Páginas das lojas simuladas (os testes não usam a internet): sem leitura, vale o texto da mensagem
+for (const loja of ['amazon', 'kabum', 'magalu']) getStore(loja).lerProduto = async () => null;
 repostar._paraTestes({ pausa: false });
 
 const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -267,4 +269,24 @@ test('lê os preços nos formatos comuns dos grupos de ofertas', () => {
   assert.equal(tv.atual, 2199);
   assert.ok(Math.abs(tv.anterior - 2783.54) < 0.01, 'o preço "de" sai do desconto, sem contar a parcela');
   assert.deepEqual(v('Air Fryer Mondial 4L\n💸 R$ 289,90'), ['Air Fryer Mondial 4L', null, 289.9]);
+});
+
+test('mensagem sem preço: busca na página da loja; palavra proibida e horário não barram', async () => {
+  configurar({ repost_inicio: '03:00', repost_fim: '03:01' }); // horário antigo que nunca bate: não vale mais
+  const proibidas = require('../src/palavras-proibidas');
+  const amazon = getStore('amazon');
+  const ler = amazon.lerProduto;
+  amazon.lerProduto = async asin => ({ deal: { store_product_id: asin, produto: 'Monitor AOC 27 120Hz Gaming Vape Edition', preco_atual: 661, preco_anterior: 819,
+    imagem: 'https://m.media-amazon.com/images/I/x.jpg', original_url: `https://www.amazon.com.br/dp/${asin}` } });
+  const antesLista = proibidas.listar ? proibidas.listar() : null;
+  settings.set('mineracao_palavras_proibidas', 'vape');
+  try {
+    const antes = enviados.length;
+    repostar.receber(null, mensagem('🔥 Achadinho do dia\nhttps://www.amazon.com.br/dp/B0F81WGSYP?tag=outro-20'));
+    await ate(() => registro().some(r => r.chave === 'amazon:B0F81WGSYP'));
+    const r = registro().find(x => x.chave === 'amazon:B0F81WGSYP');
+    assert.equal(r.situacao, 'postada', r.motivo);
+    assert.equal(enviados.length, antes + 1);
+    assert.match(enviados.at(-1).texto, /661/);
+  } finally { amazon.lerProduto = ler; if (antesLista) settings.set('mineracao_palavras_proibidas', antesLista.join(', ')); }
 });

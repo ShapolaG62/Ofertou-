@@ -90,7 +90,32 @@ async function radar() {
   return { status: 'ok', deals: parseOfertas(html) };
 }
 
+// Um produto pela página dele (/dp/ASIN): usado pela repostagem quando a mensagem não traz os preços.
+// { deal } | { disponivel: false } (sem estoque ou sem preço riscado) | null (não deu para ler)
+const entidadesHtml = s => String(s || '').replace(/&#34;|&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+async function lerProduto(asin) {
+  if (!/^[A-Z0-9]{10}$/.test(String(asin))) return null;
+  const res = await http.get(`${BASE}/dp/${asin}`, { validateStatus: () => true, timeout: 25000 });
+  const html = String(res.data || '');
+  if (res.status === 404) return { disponivel: false };
+  if (res.status >= 400 || /validateCaptcha|bm-verify|_sec\/verify/i.test(html.slice(0, 20000))) return null;
+  const titulo = entidadesHtml((/id="productTitle"[^>]*>([^<]+)</.exec(html) || [])[1]);
+  const ini = html.indexOf('corePriceDisplay_desktop_feature_div');
+  const bloco = ini >= 0 ? html.slice(ini, ini + 8000) : '';
+  // Preço a pagar: o texto escondido às vezes vem vazio; então junta a parte inteira e os centavos mostrados
+  const pagar = bloco.slice(Math.max(0, bloco.indexOf('priceToPay')));
+  const partes = /a-price-whole">([\d.]+)[\s\S]{0,120}?a-price-fraction">(\d{2})/.exec(pagar);
+  const atual = partes ? parseBRL(`${partes[1]},${partes[2]}`) : parseBRL((/a-offscreen">\s*(R\$[^<]+)/.exec(pagar) || [])[1] || '');
+  const anterior = parseBRL((/De:\s*<\/span>[\s\S]{0,300}?a-offscreen">([^<]+)/.exec(bloco) || /a-text-price"[^>]*data-a-strike="true"[\s\S]{0,200}?a-offscreen">([^<]+)/.exec(bloco) || [])[1] || '');
+  const semEstoque = /id="outOfStock"|Atualmente indisponível/i.test(html);
+  if (!titulo) return null;
+  if (semEstoque || !atual || !(anterior > atual)) return { disponivel: false };
+  const img = (/"hiRes":"(https:[^"]+)"/.exec(html) || /id="landingImage"[^>]*src="(https:[^"]+)"/.exec(html) || [])[1] || null;
+  return { deal: { store_product_id: asin, produto: titulo, preco_atual: atual, preco_anterior: anterior, imagem: img, original_url: `${BASE}/dp/${asin}` } };
+}
+
 module.exports = {
+  lerProduto,
   radar,
   parseOfertas,
   id: 'amazon',

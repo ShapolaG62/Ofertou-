@@ -101,13 +101,11 @@
         <label class="field">Desconto mínimo (%) <input type="number" id="rp-desconto" min="1" max="90" inputmode="numeric"></label>
         <label class="field">Máximo por hora <input type="number" id="rp-hora" min="1" max="30" inputmode="numeric"></label>
         <label class="field">Intervalo mínimo (min) <input type="number" id="rp-intervalo" min="1" max="120" inputmode="numeric"></label>
-        <label class="field">Começa às <input type="text" id="rp-inicio" inputmode="numeric" maxlength="5" placeholder="08:00"></label>
-        <label class="field">Para às <input type="text" id="rp-fim" inputmode="numeric" maxlength="5" placeholder="22:00"></label>
       </div>
       <label class="rp-chave" style="font-weight:500;margin-top:12px"><input type="checkbox" id="rp-tipo"> Cada grupo de destino recebe só o tipo e a loja marcados nele</label>
       <p class="hint cli-hint" style="margin-top:10px">Lojas (nenhuma marcada = todas em que você tem link de afiliado):</p>
       <div class="rp-lojas" id="rp-lojas"></div>
-      <p class="hint cli-hint">Também valem a lista de palavras proibidas, as palavras bloqueadas do agendamento e a regra de não repetir o mesmo produto em 7 dias.</p>
+      <p class="hint cli-hint">Repostagem a qualquer hora, sem as palavras proibidas e as do agendamento. Quando a mensagem não traz o preço, o site busca na página da oferta. Vale a regra de não repetir o mesmo produto em 7 dias.</p>
     </div>
 
     <div class="actions cli-actions" style="justify-content:flex-start;margin-top:14px">
@@ -217,8 +215,6 @@
     $('rp-desconto').value = a.desconto_min;
     $('rp-hora').value = a.por_hora;
     $('rp-intervalo').value = a.intervalo_min;
-    $('rp-inicio').value = a.inicio;
-    $('rp-fim').value = a.fim;
     $('rp-tipo').checked = a.por_tipo;
     const sem = new Set((dados.sem_afiliado || []).map(n => NOME_SEM_AFILIADO[n]).filter(Boolean));
     $('rp-lojas').innerHTML = dados.lojas.map(id => `<label><input type="checkbox" value="${id}" ${a.lojas.includes(id) ? 'checked' : ''}> ${LOJAS[id]}${sem.has(id) ? ' <em>(sem link de afiliado)</em>' : ''}</label>`).join('');
@@ -245,7 +241,6 @@
       ativo: $('rp-ativo').checked, origens: ids('origem'), por_tipo: $('rp-tipo').checked,
       destinos: (dados?.grupos_destino || []).map(g => ({ id: g.id, origens: origensDe(g.id) })).filter(g => g.origens.length),
       desconto_min: $('rp-desconto').value, por_hora: $('rp-hora').value, intervalo_min: $('rp-intervalo').value,
-      inicio: $('rp-inicio').value, fim: $('rp-fim').value,
       lojas: [...$('rp-lojas').querySelectorAll('input:checked')].map(i => i.value),
     };
     $('rp-msg').textContent = 'Salvando…';

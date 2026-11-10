@@ -41,7 +41,8 @@ function saveDeal(store, deal, opts = {}) {
   const desconto = discountOf(atual, anterior);
   if (!produto || !deal.store_product_id || !deal.original_url) return null;
   if (!(atual > 0) || desconto < minDiscount || desconto > MAX_DISCOUNT) return null;
-  if (fonte === 'auto' && palavrasProibidas.bloqueia(produto)) return null;
+  // ignorarProibidas: a repostagem de ofertas dos grupos de origem grava mesmo com palavra proibida (escolha do dono)
+  if (fonte === 'auto' && !opts.ignorarProibidas && palavrasProibidas.bloqueia(produto)) return null;
 
   const offer = { ...deal, produto, preco_atual: atual, preco_anterior: anterior };
   const affFixed = deal.affiliate_url ? 1 : 0;

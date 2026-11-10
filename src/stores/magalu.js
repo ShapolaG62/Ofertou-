@@ -62,7 +62,24 @@ async function search(query, s) {
   return { status: 'ok', deals: parse(produtos) };
 }
 
+// Um produto pela página dele na loja Magazine Você (sem "?" no endereço, como pede o robots.txt):
+// usado pela repostagem quando a mensagem não traz os preços.
+async function lerProduto(sku, s) {
+  const loja = lojaDe(s);
+  if (!loja || !/^[a-z0-9]{5,20}$/i.test(String(sku))) return null;
+  const res = await http.get(`${VOCE}/magazine${loja}/p/${sku}/`, { validateStatus: () => true, timeout: 25000 });
+  if (res.status === 404) return { disponivel: false };
+  if (res.status >= 400) return null;
+  const m = String(res.data || '').match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  let p = null;
+  try { p = m && JSON.parse(m[1])?.props?.pageProps?.data?.product; } catch { p = null; }
+  if (!p) return null;
+  const deals = parse([p]);
+  return deals.length ? { deal: deals[0] } : { disponivel: false };
+}
+
 module.exports = {
+  lerProduto,
   parse,
   id: 'magalu',
   name: 'Magalu',

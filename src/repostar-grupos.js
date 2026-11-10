@@ -81,13 +81,6 @@ function ajustesRapidos(cid) {
   return novo;
 }
 
-function dentroDoHorario(a) {
-  const d = new Date(Date.now() - 3 * 3600000);
-  const min = d.getUTCHours() * 60 + d.getUTCMinutes();
-  const ini = hhmm(a.inicio), fim = hhmm(a.fim);
-  return ini <= fim ? min >= ini && min < fim : min >= ini || min < fim;
-}
-
 // Grupos de destino da repostagem: os salvos em "Grupos de destino" (o número é administrador deles)
 const gruposDestino = s => require('./whatsapp').gruposEscolhidos(s).map(g => ({ id: String(g.id), nome: g.nome || String(g.id) }));
 
@@ -236,6 +229,8 @@ async function lerNaLoja(store, url, pid) {
     if (d.disponivel === false) return { disponivel: false };
     return { deal: d };
   }
+  // Amazon (página do produto), KaBuM! (catálogo da loja) e Magalu (página do produto na sua loja Magazine Você)
+  if (['amazon', 'kabum', 'magalu'].includes(store.id) && pid) return getStore(store.id).lerProduto(pid, s);
   return null;
 }
 
@@ -296,8 +291,8 @@ async function ofertaDaMensagem(cid, item) {
   if (loja?.disponivel === false) return { erro: `A ${store.name} informou que o produto não está disponível ou está sem desconto.`, store, chave };
   if (loja?.deal) {
     const deal = { ...loja.deal, original_url: limparLink(store, loja.deal.original_url) || limpo };
-    const id = offers.saveDeal(store, deal, { fonte: 'auto' });
-    if (!id) return { erro: `Na ${store.name}, o desconto está fora da faixa aceita ou o produto tem palavra proibida.`, store, chave };
+    const id = offers.saveDeal(store, deal, { fonte: 'auto', ignorarProibidas: true });
+    if (!id) return { erro: `Na ${store.name}, o desconto está fora da faixa aceita (1% a 99%).`, store, chave };
     return { o: db.get('SELECT * FROM offers WHERE id = ?', id), store, chave, conferida: true };
   }
   // Sem API da loja: usa o nome e os preços escritos na mensagem (o preço é conferido de novo antes de postar, quando dá)
@@ -311,8 +306,8 @@ async function ofertaDaMensagem(cid, item) {
     if (ml?.disponivel === false) return { erro: 'O Mercado Livre informou que o anúncio não está mais disponível.', store, chave };
     if (ml?.preco && ml.preco_anterior > ml.preco) {
       const id = offers.saveDeal(store, { store_product_id: pid, produto: ml.produto, preco_atual: ml.preco, preco_anterior: ml.preco_anterior,
-        imagem: ml.imagem, original_url: limpo }, { fonte: 'auto' });
-      if (!id) return { erro: 'No Mercado Livre, o desconto está fora da faixa aceita ou o produto tem palavra proibida.', store, chave };
+        imagem: ml.imagem, original_url: limpo }, { fonte: 'auto', ignorarProibidas: true });
+      if (!id) return { erro: 'No Mercado Livre, o desconto está fora da faixa aceita (1% a 99%).', store, chave };
       return { o: db.get('SELECT * FROM offers WHERE id = ?', id), store, chave, conferida: true };
     }
     if (ml?.preco) return { erro: 'No Mercado Livre, o anúncio está sem preço riscado (sem desconto).', store, chave };
@@ -337,11 +332,8 @@ function barrar(cid, s, a, o) {
   if (a.lojas.length && !a.lojas.includes(o.store_id)) return `A ${nome} não está entre as lojas escolhidas.`;
   if (!clientes.lojasComAfiliado(s).includes(o.store_id)) return `Seu link de afiliado da ${nome} não está configurado: a venda não renderia comissão.`;
   if (Number(o.desconto_pct) < a.desconto_min) return `Desconto de ${Math.round(o.desconto_pct)}%, abaixo do mínimo de ${a.desconto_min}%.`;
-  if (require('./palavras-proibidas').bloqueia(o.produto)) return 'O produto tem uma palavra da lista de proibidas.';
-  const agenda = require('./agenda');
-  // Só as palavras bloqueadas valem aqui; a lista de palavras permitidas é do agendamento (ela barrava quase tudo)
-  if (!agenda.filtroDoDono({ ...s, agenda_lojas: '', agenda_palavras_permitidas: '' })(o)) return 'O produto tem uma das palavras bloqueadas do agendamento.';
-  const rep = agenda.regraDeRepeticao(cid);
+  // As palavras proibidas e as do agendamento não valem aqui: o que chega dos grupos de origem é repostado
+  const rep = require('./agenda').regraDeRepeticao(cid);
   if (rep.porOferta(o) || rep.porProduto(o)) return 'Este produto já foi postado nos últimos 7 dias e o preço não caiu 10%.';
   return null;
 }
@@ -439,7 +431,6 @@ async function tratar(cid, item) {
   if (r.silencio) return;
   const base = { chave: r.chave, store_id: r.store?.id, produto: r.o?.produto, offer_id: r.o?.id };
   if (r.erro) return registrar(cid, item, { ...base, situacao: 'ignorada', motivo: r.erro });
-  if (!dentroDoHorario(a)) return registrar(cid, item, { ...base, situacao: 'ignorada', motivo: `Fora do horário de postagem (${a.inicio} às ${a.fim}).` });
   const motivo = barrar(cid, s, a, r.o);
   if (motivo) return registrar(cid, item, { ...base, situacao: 'ignorada', motivo });
 

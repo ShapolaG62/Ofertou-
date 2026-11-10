@@ -83,7 +83,19 @@ async function search(query) {
   return { status: 'ok', deals: parse(res.data.data) };
 }
 
+// Um produto pelo código (a mesma API que o site da KaBuM! usa): usado pela repostagem quando a mensagem não traz os preços.
+async function lerProduto(id) {
+  if (!/^\d{3,12}$/.test(String(id))) return null;
+  const res = await http.get(`${API}/${id}`, { headers: { Accept: 'application/json', Origin: SITE, Referer: `${SITE}/` }, validateStatus: () => true, timeout: 20000 });
+  if (res.status === 404) return { disponivel: false };
+  const produto = res.data?.data || res.data; // a API devolve o produto direto (ou dentro de "data")
+  if (res.status >= 400 || !produto?.attributes) return null;
+  const deals = parse([produto]);
+  return deals.length ? { deal: deals[0] } : { disponivel: false };
+}
+
 module.exports = {
+  lerProduto,
   parse,
   relampagoDe,
   id: 'kabum',
