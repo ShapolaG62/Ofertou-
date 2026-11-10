@@ -79,6 +79,9 @@ function validarLogado(p, b, u) {
     return dados;
   };
 
+  // Acesso de afiliado com o mesmo e-mail que não é desta conta: não liga sem prova (ver clientes.ligacaoPermitida)
+  const outroAcesso = (p.conta === 'cliente' || p.ferramenta) && clientes.acessoComMesmoEmail(u);
+  if (outroAcesso && !clientes.ligacaoPermitida(u, outroAcesso)) throw fail(clientes.MSG_OUTRO_ACESSO, 409);
   if (p.conta === 'cliente') {
     const existente = (u.cliente_id && clientes.getById(u.cliente_id)) || db.get('SELECT * FROM clientes WHERE email = ?', u.email);
     if (existente) return { email: u.email, nome: existente.nome, renovar_cliente_id: existente.id, vincular_user_id: u.id };
@@ -146,7 +149,13 @@ function validarDados(p, b, logado = null) {
     return { email: emailN, nome, cpf, telefone: tel, senha_hash: auth.hashPassword(senha) };
   }
 
-  // Consumidor ou empresa: conta do site
+  // Consumidor ou empresa: conta do site. Plano com a ferramenta e e-mail que já tem acesso de afiliado: precisa da senha do painel
+  const acessoAfiliado = p.ferramenta && db.get('SELECT * FROM clientes WHERE email = ?', emailN);
+  const afiliadoConfirmado = Boolean(acessoAfiliado && auth.verifyPassword(senha, acessoAfiliado.senha_hash));
+  if (acessoAfiliado && !afiliadoConfirmado) {
+    const contaDoSite = db.get('SELECT * FROM users WHERE email = ?', emailN);
+    if (!contaDoSite || !clientes.ligacaoPermitida(contaDoSite, acessoAfiliado)) throw fail(clientes.MSG_OUTRO_ACESSO, 409);
+  }
   const existente = db.get('SELECT * FROM users WHERE email = ?', emailN);
   if (existente) {
     if (!existente.senha_hash || !auth.verifyPassword(senha, existente.senha_hash)) {
@@ -155,7 +164,7 @@ function validarDados(p, b, logado = null) {
     if (['banned', 'rejected'].includes(existente.status)) throw fail('Esta conta não pode assinar. Fale com o administrador.', 403);
     const perfil = perfilDaConta(p, b, existente);
     parceiro(p, b, perfil);
-    return { email: emailN, nome: existente.nome, renovar_user_id: existente.id, perfil_conta: perfil };
+    return { email: emailN, nome: existente.nome, renovar_user_id: existente.id, perfil_conta: perfil, ...(afiliadoConfirmado ? { afiliado_confirmado: true } : {}) };
   }
   if (renovar) throw fail('Não encontramos uma conta com este e-mail. Desmarque "renovar" para criar uma nova.', 404);
   if (b.senha_confirmacao !== undefined && b.senha_confirmacao !== senha) throw fail('As senhas não conferem.');
@@ -166,7 +175,7 @@ function validarDados(p, b, logado = null) {
   if (db.get('SELECT 1 FROM users WHERE cpf = ?', dados.cpf)) throw fail('Já existe uma conta com este CPF. Entre com ela para assinar.', 409);
   if (dados.cnpj && db.get('SELECT 1 FROM users WHERE cnpj = ?', dados.cnpj)) throw fail('Já existe uma conta com este CNPJ.', 409);
   require('./senha').validar(senha, { email: emailN, nome: dados.nome }); // conta nova: senha forte
-  return { email: emailN, nome: dados.nome, ...dados, perfil_conta: perfil, senha_hash: auth.hashPassword(senha) };
+  return { email: emailN, nome: dados.nome, ...dados, perfil_conta: perfil, senha_hash: auth.hashPassword(senha), ...(afiliadoConfirmado ? { afiliado_confirmado: true } : {}) };
 }
 
 function baseUrl(req) {
@@ -416,12 +425,12 @@ function aprovar(pedidoId, origem) {
         validade = somaDias(null, pedido.dias);
         const { email: em, nome, senha_hash, ...resto } = d;
         const cols = { email: em, nome, senha_hash, status: 'active', plano: p.id, assinatura_ate: validade, aceite_termos_em: nowSql(), ...resto, tipo: perfil };
-        delete cols.renovar_user_id; delete cols.perfil_conta;
+        delete cols.renovar_user_id; delete cols.perfil_conta; delete cols.afiliado_confirmado;
         contaId = Number(db.run(`INSERT INTO users (${Object.keys(cols).join(', ')}) VALUES (${Object.keys(cols).map(() => '?').join(', ')})`,
           ...Object.values(cols)).lastInsertRowid);
       }
       // Plano com a ferramenta junto: a mesma conta ganha o painel de afiliado (mesmo login, mesma validade)
-      if (p.ferramenta) clientes.liberarPlano(users.getById(contaId), p.id, atual => somaDias(atual, pedido.dias));
+      if (p.ferramenta) clientes.liberarPlano(users.getById(contaId), p.id, atual => somaDias(atual, pedido.dias), { confirmado: d.afiliado_confirmado === true });
       users.logAction(users.getById(contaId), 'assinatura_aprovada', `${p.nome} ${validade === planos.SEM_VENCIMENTO ? 'sem vencimento' : `até ${validade.slice(0, 10)}`} (${origem})`);
     }
     // Não guarda a senha (hash) além do necessário.

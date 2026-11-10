@@ -324,8 +324,10 @@ function updateProfile(u, body) {
 function changePassword(u, atual, nova) {
   if (u.senha_hash && !verifyPassword(String(atual || ''), u.senha_hash)) throw new Error('Senha atual incorreta.');
   require('./senha').validar(nova, { email: u.email, nome: u.nome }); // padrão de senha forte
-  db.run('UPDATE users SET senha_hash = ? WHERE id = ?', hashPassword(nova), u.id);
+  const novoHash = hashPassword(nova);
+  db.run('UPDATE users SET senha_hash = ? WHERE id = ?', novoHash, u.id);
   db.run('DELETE FROM user_sessions WHERE user_id = ?', u.id);
+  require('./clientes').aoTrocarSenhaDaConta(u.id, novoHash);
 }
 
 function deleteOwnAccount(u, body) {

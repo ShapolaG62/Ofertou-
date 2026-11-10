@@ -17,10 +17,33 @@ function isPrivateIp(ip) {
       || (a === 192 && b === 168)
       || (a === 198 && (b === 18 || b === 19));
   }
-  const v6 = ip.toLowerCase();
-  if (v6.startsWith('::ffff:')) return isPrivateIp(v6.slice(7));
-  return v6 === '::' || v6 === '::1' || v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe8')
-    || v6.startsWith('fe9') || v6.startsWith('fea') || v6.startsWith('feb') || v6.startsWith('ff');
+  const g = gruposV6(ip);
+  if (!g) return true; // endereço que não deu para ler: na dúvida, recusa
+  const v4 = (hi, lo) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  const zeros = n => g.slice(0, n).every(x => x === 0);
+  // Endereços IPv6 que carregam um IPv4 dentro: confere o IPv4 (senão [::ffff:127.0.0.1] passava como externo)
+  if (zeros(5) && g[5] === 0xffff) return isPrivateIp(v4(g[6], g[7]));               // ::ffff:a.b.c.d (mapeado)
+  if (zeros(6)) return g[6] === 0 && g[7] <= 1 ? true : isPrivateIp(v4(g[6], g[7])); // ::, ::1 e ::a.b.c.d
+  if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every(x => x === 0)) return isPrivateIp(v4(g[6], g[7])); // 64:ff9b::/96 (NAT64)
+  if (g[0] === 0x2002) return isPrivateIp(v4(g[1], g[2]));                              // 2002::/16 (6to4)
+  if (g[0] === 0x100 && g[1] === 0 && g[2] === 0 && g[3] === 0) return true;          // 100::/64 (descarte)
+  return (g[0] & 0xfe00) === 0xfc00 || (g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xff00) === 0xff00; // local, link-local, multicast
+}
+
+// "::ffff:7f00:1" → [0,0,0,0,0,0xffff,0x7f00,1] (aceita a forma com IPv4 no fim). null = não é IPv6 válido.
+function gruposV6(ip) {
+  let s = String(ip).toLowerCase().replace(/^\[|\]$/g, '').split('%')[0];
+  if (!net.isIPv6(s)) return null;
+  const m = /(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+  if (m) {
+    const [a, b, c, d] = m[1].split('.').map(Number);
+    s = s.slice(0, -m[1].length) + `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [esq, dir] = s.includes('::') ? s.split('::') : [s, null];
+  const parte = t => (t ? t.split(':').map(x => parseInt(x, 16)) : []);
+  const a = parte(esq), b = dir === null ? [] : parte(dir);
+  const grupos = dir === null ? a : [...a, ...Array(8 - a.length - b.length).fill(0), ...b];
+  return grupos.length === 8 && grupos.every(x => Number.isInteger(x) && x >= 0 && x <= 0xffff) ? grupos : null;
 }
 
 // Resolve o nome e recusa a conexão se qualquer endereço for interno (vale também para redirecionamentos).

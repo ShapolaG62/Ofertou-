@@ -71,8 +71,10 @@ function redefinir(token, nova) {
   const u = users.getById(r.user_id);
   if (!u) throw fail('Conta não encontrada.', 404);
   require('./senha').validar(nova, { email: u.email, nome: u.nome }); // padrão de senha forte
+  const novoHash = hashPassword(nova);
   db.transaction(() => {
-    db.run('UPDATE users SET senha_hash = ? WHERE id = ?', hashPassword(nova), u.id);
+    db.run('UPDATE users SET senha_hash = ? WHERE id = ?', novoHash, u.id);
+    require('./clientes').aoTrocarSenhaDaConta(u.id, novoHash);
     db.run('DELETE FROM user_sessions WHERE user_id = ?', u.id); // quem estava logado com a senha antiga sai
     db.run('DELETE FROM senha_reset WHERE user_id = ?', u.id);
   });

@@ -44,6 +44,12 @@ function planoDoProduto(produto, entitlement, s) {
 function liberar(u, plano, expiraSql, origem) {
   const p = planos.plano(plano);
   if (!p) return null;
+  // E-mail com acesso de afiliado que não é desta conta: não liga sem prova (o admin junta as contas, se for o caso)
+  const outroAcesso = (p.conta === 'cliente' || p.ferramenta) && clientes.acessoComMesmoEmail(u);
+  if (outroAcesso && !clientes.ligacaoPermitida(u, outroAcesso)) {
+    users.logAction(u, 'assinatura_app_conflito', `${p.nome}: o e-mail já tem outro acesso de afiliado (${origem})`);
+    return null;
+  }
   if (p.conta === 'cliente') {
     const antes = u.cliente_id && clientes.getById(u.cliente_id);
     const cid = clientes.vincularUsuario(u);
@@ -90,6 +96,9 @@ async function sincronizar(userId, origem = 'app') {
     if (!expira || expira <= new Date()) continue; // vencido (assinaturas sempre têm data de expiração)
     const plano = planoDoProduto(e.product_identifier, ent, s);
     if (!plano) continue;
+    // Compra de teste (TestFlight, testador de licença do Google Play) não libera plano de verdade
+    const assinatura = r.data?.subscriber?.subscriptions?.[e.product_identifier];
+    if (assinatura?.is_sandbox) { users.logAction(u, 'assinatura_app_teste', `${plano}: compra de teste ignorada (${origem})`); continue; }
     const ok = liberar(users.getById(userId), plano, sqlDe(expira), origem);
     if (ok) liberados.push(ok);
   }

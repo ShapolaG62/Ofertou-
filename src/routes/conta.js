@@ -162,7 +162,7 @@ router.get('/api/conta/me', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const u = users.currentUser(req);
   if (!u) return res.json({ user: null, admin: auth.isLoggedIn(req) });
-  res.json({ user: users.publicUser(u), loja: u.tipo === 'empresa' ? lojas.getByUser(u.id) : null, parceiro_pendente: parceiroPendente(u) });
+  res.json({ user: users.publicUser(u), loja: u.tipo === 'empresa' ? lojas.paraODono(lojas.getByUser(u.id)) : null, parceiro_pendente: parceiroPendente(u) });
 });
 
 // Termos do Parceiro: lojista (conta de empresa) e afiliado que ainda não aceitaram a versão atual
@@ -249,7 +249,7 @@ router.delete('/api/conta/loja', (req, res) => {
 });
 
 router.put('/api/conta/loja', (req, res) => {
-  try { res.json({ ok: true, loja: lojas.saveLoja(req.user, req.body || {}) }); } catch (err) { sendError(res, err); }
+  try { res.json({ ok: true, loja: lojas.paraODono(lojas.saveLoja(req.user, req.body || {})) }); } catch (err) { sendError(res, err); }
 });
 
 router.get('/api/conta/produtos', (req, res) => {
@@ -284,7 +284,7 @@ router.put('/api/conta/anuncios/:id', (req, res) => {
 });
 
 router.put('/api/conta/feed', (req, res) => {
-  try { res.json({ ok: true, loja: lojas.setFeed(req.user, req.body?.feed_url) }); } catch (err) { sendError(res, err); }
+  try { res.json({ ok: true, loja: lojas.paraODono(lojas.setFeed(req.user, req.body?.feed_url)) }); } catch (err) { sendError(res, err); }
 });
 
 router.post('/api/conta/feed/sincronizar', async (req, res) => {

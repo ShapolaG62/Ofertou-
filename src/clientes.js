@@ -98,6 +98,9 @@ function listar() {
 // ── Login do cliente ─────────────────────────────────────────────────────────
 function motivoBloqueio(c) {
   if (c.status === 'bloqueado') return 'Seu acesso está bloqueado. Fale com o administrador.';
+  // Conta do site ligada a este acesso que foi suspensa, banida ou recusada: o painel do afiliado também fecha
+  const conta = db.get('SELECT status FROM users WHERE cliente_id = ? ORDER BY id LIMIT 1', c.id);
+  if (conta && ['suspended', 'banned', 'rejected'].includes(conta.status)) return 'Sua conta está suspensa. Fale com o administrador.';
   if (vencido(c)) return 'Seu acesso venceu. Fale com o administrador para renovar.';
   return null;
 }
@@ -148,6 +151,14 @@ function encerrarSessao(req, res) {
   res.append('Set-Cookie', `${COOKIE}=; Max-Age=0; ${auth.cookieFlags(req)}`);
 }
 const encerrarSessoes = id => db.run('DELETE FROM cliente_sessions WHERE cliente_id = ?', id);
+// A senha da conta do site mudou (troca, "Esqueci minha senha" ou pela equipe): o painel do afiliado ligado usa a nova
+// e quem estava logado nele com a senha antiga sai.
+function aoTrocarSenhaDaConta(userId, novoHash) {
+  const u = db.get('SELECT cliente_id FROM users WHERE id = ?', Number(userId));
+  if (!u?.cliente_id) return;
+  db.run('UPDATE clientes SET senha_hash = ? WHERE id = ?', novoHash, u.cliente_id);
+  encerrarSessoes(u.cliente_id);
+}
 
 // Cliente logado, com acesso válido (ativo e dentro da validade); senão null.
 function atual(req) {
@@ -163,11 +174,25 @@ function atual(req) {
   return v && !motivoBloqueio(v) ? v : null;
 }
 
+// Já existe um acesso de afiliado com o e-mail desta conta e ele não está ligado a ela? Ligar exige prova de que é a mesma
+// pessoa: e-mail confirmado pelo Google, a mesma senha, ou a senha do painel do afiliado conferida (no pagamento).
+// O site não confirma e-mail no cadastro: sem isso, quem criasse uma conta com o e-mail de um afiliado ficaria com o acesso dele.
+const MSG_OUTRO_ACESSO = 'Este e-mail já tem um acesso ao painel do afiliado. Entre com o Google usando este e-mail, use a senha do painel do afiliado ou fale com o suporte para juntar as contas.';
+function ligacaoPermitida(u, c, confirmado = false) {
+  if (db.get('SELECT 1 FROM users WHERE cliente_id = ? AND id <> ?', c.id, u.id)) return false; // já é de outra conta
+  return Boolean(confirmado || u.google_id || (u.senha_hash && u.senha_hash === c.senha_hash));
+}
+function acessoComMesmoEmail(u) {
+  if (u.cliente_id && getById(u.cliente_id)) return null;
+  return db.get('SELECT * FROM clientes WHERE email = ?', u.email) || null;
+}
+
 // Liga (ou cria) o acesso da ferramenta de uma conta do site — cadastro gratuito de afiliado aprovado pelo admin.
-function vincularUsuario(u, dias = null) {
+function vincularUsuario(u, dias = null, { confirmado = false } = {}) {
   const ligado = u.cliente_id && getById(u.cliente_id);
   if (ligado) return ligado.id;
   let c = db.get('SELECT * FROM clientes WHERE email = ?', u.email);
+  if (c && !ligacaoPermitida(u, c, confirmado)) throw Object.assign(new Error(MSG_OUTRO_ACESSO), { status: 409 });
   if (!c) {
     const pf = require('./planos').planoFerramenta();
     const d = dias || (pf ? pf.dias : 30);
@@ -182,9 +207,9 @@ function vincularUsuario(u, dias = null) {
 
 // Plano com a ferramenta comprado por uma conta do site: liga (ou cria) o acesso e define a validade.
 // calcValidade recebe a validade atual do acesso (ou null) e devolve a nova.
-function liberarPlano(u, planoId, calcValidade) {
+function liberarPlano(u, planoId, calcValidade, opcoes = {}) {
   const antes = (u.cliente_id && getById(u.cliente_id)) || db.get('SELECT * FROM clientes WHERE email = ?', u.email);
-  const cid = vincularUsuario(u);
+  const cid = vincularUsuario(u, null, opcoes);
   const validade = calcValidade(antes ? antes.validade : null);
   db.run(`UPDATE clientes SET validade = ?, status = 'ativo', plano = ? WHERE id = ?`, validade, planoId, cid);
   return { id: cid, validade };
@@ -304,6 +329,10 @@ module.exports = {
   linkParaPostar,
   renovarSessao,
   vincularUsuario,
+  aoTrocarSenhaDaConta,
+  ligacaoPermitida,
+  acessoComMesmoEmail,
+  MSG_OUTRO_ACESSO,
   CLIENT_KEYS, SECRET_KEYS, criar, editar, renovar, definirStatus, excluir, listar, getById, login, criarSessao,
   encerrarSessao, atual, exigir, config, configParaPainel, salvarConfig, linkAfiliado, lojasSemAfiliado, publico, motivoBloqueio,
 };

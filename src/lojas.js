@@ -20,6 +20,15 @@ function uniqueSlug(base, ignoreId = null) {
 }
 
 const getByUser = userId => db.get('SELECT * FROM lojas WHERE user_id = ?', userId) || null;
+// A loja como o dono vê no navegador: sem os tokens de acesso do Mercado Pago (ficam só no servidor)
+const SEGREDOS_LOJA = ['mp_access_token', 'mp_refresh_token'];
+function paraODono(loja) {
+  if (!loja) return loja;
+  const out = { ...loja };
+  for (const k of SEGREDOS_LOJA) delete out[k];
+  out.mp_conectado = Boolean(loja.mp_access_token);
+  return out;
+}
 
 // "Loja" no formato que o gravador de ofertas espera.
 const pseudoStore = loja => ({ id: `loja:${loja.id}`, name: loja.nome, affiliateLink: o => o.original_url });
@@ -168,5 +177,5 @@ function setHidden(lojaId, oculta) {
 }
 
 module.exports = {
-  getByUser, pseudoStore, assertCanPublishUser: assertCanPublish, saveLoja, listProducts, deleteProduct, setFeed, syncFeed, syncAllFeeds, publicStore, setHidden, excluirLoja,
+  getByUser, paraODono, pseudoStore, assertCanPublishUser: assertCanPublish, saveLoja, listProducts, deleteProduct, setFeed, syncFeed, syncAllFeeds, publicStore, setHidden, excluirLoja,
 };

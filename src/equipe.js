@@ -60,6 +60,8 @@ function adicionar(b, quem = 'admin') {
   if (existe) {
     if (['banned', 'rejected'].includes(existe.status)) throw fail('Esta conta está banida ou recusada. Reative a conta antes.');
     exigirGerenciar(quem, existe);
+    // Conta que já existe (cliente, lojista, afiliado): a senha é da pessoa; só o dono do site pode trocar
+    if (b.senha && !existe.staff && !cargos.de(quem).dono_site) throw fail('Esta conta já existe: a pessoa entra com a senha dela. Deixe o campo de senha em branco.', 403);
     db.run(`UPDATE users SET staff = 1, cargo = ?, nome = COALESCE(NULLIF(nome, ''), ?) WHERE id = ?`, novo, nome || null, existe.id);
     if (b.senha) definirSenha(existe.id, b.senha, quem, false);
     id = existe.id;
@@ -93,9 +95,12 @@ function definirSenha(id, senha, quem = 'admin', registrar = true) {
   const u = users.getById(Number(id));
   if (!u) throw fail('Pessoa não encontrada.', 404);
   exigirGerenciar(quem, u);
+  if (!u.staff && !cargos.de(quem).dono_site) throw fail('Só o dono do site pode trocar a senha de quem não é da equipe.', 403);
   require('./senha').validar(senha, { email: u.email, nome: u.nome }); // padrão de senha forte
-  db.run('UPDATE users SET senha_hash = ? WHERE id = ?', hashPassword(senha), u.id);
+  const novoHash = hashPassword(senha);
+  db.run('UPDATE users SET senha_hash = ? WHERE id = ?', novoHash, u.id);
   db.run('DELETE FROM user_sessions WHERE user_id = ?', u.id); // sai de todos os aparelhos
+  require('./clientes').aoTrocarSenhaDaConta(u.id, novoHash);
   if (registrar) users.logAction(u, 'equipe_senha', `senha redefinida por ${nomeQuem(quem)}`);
   return montar(users.getById(u.id));
 }

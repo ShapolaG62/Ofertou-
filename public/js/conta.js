@@ -362,7 +362,13 @@
   // Depois de entrar, uma conta liberada vai direto para as ofertas (ou para a página que tentou abrir).
   function goToSite(padrao = '/') {
     const voltar = new URLSearchParams(location.search).get('voltar');
-    location.href = voltar && /^\/(?!\/)/.test(voltar) ? voltar : padrao;
+    // Só páginas do próprio site ("/\evil.com" o navegador lê como outro site)
+    let destino = padrao;
+    try {
+      const u = new URL(voltar || '', location.origin);
+      if (voltar && /^\/(?![/\\])/.test(voltar) && u.origin === location.origin) destino = u.pathname + u.search + u.hash;
+    } catch { /* endereço inválido: vai para o padrão */ }
+    location.href = destino;
   }
 
   function setAuthTab(tab) {
