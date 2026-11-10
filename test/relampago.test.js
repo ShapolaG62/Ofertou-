@@ -130,6 +130,22 @@ test('Mercado Livre: oferta do dia fora do catálogo (link /up/) entra com o an�
   assert.equal(o.relampago_tipo, null);
 });
 
+test('Mercado Livre: anúncio patrocinado (link do contador de cliques) entra com o link do produto, e as gravadas são consertadas', () => {
+  const cml = require('../src/cupons-ml');
+  cml.importarOfertas([{ item: 'MLB6799498078', nome: 'Chave De Impacto Brushless 700nm 2 Baterias', preco: 278.98, preco_anterior: 655,
+    link: 'https://click1.mercadolivre.com.br/mclics/clicks/external/MLB/count', relampago: false }]);
+  const o = db.get("SELECT * FROM offers WHERE store_id = 'mercadolivre' AND store_product_id = 'MLB6799498078'");
+  assert.equal(o.original_url, 'https://produto.mercadolivre.com.br/MLB-6799498078');
+  assert.match(o.affiliate_url, /^https:\/\/produto\.mercadolivre\.com\.br\/MLB-6799498078/);
+  // Oferta gravada antes da correção, com o link do contador
+  db.run(`UPDATE offers SET original_url = 'https://click1.mercadolivre.com.br/mclics/clicks/external/MLB/count', affiliate_url = 'https://click1.mercadolivre.com.br/mclics/clicks/external/MLB/count?matt_word=x' WHERE id = ?`, o.id);
+  assert.equal(cml.consertarLinks(), 1);
+  const c = db.get('SELECT original_url, affiliate_url FROM offers WHERE id = ?', o.id);
+  assert.equal(c.original_url, 'https://produto.mercadolivre.com.br/MLB-6799498078');
+  assert.doesNotMatch(c.affiliate_url, /click1/);
+  assert.equal(cml.consertarLinks(), 0, 'na segunda vez não há o que consertar');
+});
+
 test('primeira página: relâmpagos na frente, sem encher a página e sem mexer na busca', async () => {
   const busca = require('../src/busca-ofertas');
   db.run('UPDATE offers SET relampago_fim = NULL, relampago_tipo = NULL, relampago_desde = NULL');

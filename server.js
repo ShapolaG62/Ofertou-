@@ -396,6 +396,7 @@ if (process.env.VERCEL) {
       try { require('./src/vitrine').limparCache(); } catch (err) { console.error('[VITRINE]', err.message); }
     };
     limparVitrine();
+    try { require('./src/cupons-ml').consertarLinks(); } catch (err) { console.error('[ML] consertar links:', err.message); }
     setInterval(limparVitrine, 24 * 3600 * 1000); // cartões da vitrine gerados há mais de 3 dias
     // Fotos das ofertas guardadas em data/cache-img: vencidas e excesso saem de hora em hora
     const imgCache = require('./src/img-cache');

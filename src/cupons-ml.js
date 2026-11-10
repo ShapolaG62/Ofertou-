@@ -105,7 +105,7 @@ function importarProdutos(campanha, itens) {
     const base = {
       store_product_id: `MLB${id[1]}`, produto: nome, preco_atual: atual, preco_anterior: preco(it.preco_anterior) || atual,
       imagem: /^https:\/\//.test(it.imagem || '') ? it.imagem : null,
-      original_url: `${url.origin}${url.pathname}`,
+      original_url: urlDoAnuncio(url, it.item, it),
     };
     const dadosCupom = { codigo: `ML${c.campanha}`, ...desconto, minimo: c.minimo, limite: c.limite, texto: nomeDoCupom(c) };
     const deal = /OFF/i.test(String(it.rotulo || '')) ? cupons.aplicar(base, dadosCupom) : cupons.jaIncluso(base, dadosCupom);
@@ -127,7 +127,20 @@ function listar() {
 
 // Ofertas lidas pela extensão na página de ofertas do Mercado Livre. As marcadas "relâmpago" entram com a hora do fim, se a página mostrar.
 // Endereço guardado da oferta: sem rastreio; no link /up/ (vários vendedores) fica o pdp_filters do anúncio lido
-function urlDoAnuncio(url, item) {
+// Link de anúncio patrocinado (click1.mercadolivre.com.br/mclics/...): é um contador de cliques que, sem os parâmetros,
+// abre só a página inicial do Mercado Livre. Nesse caso (e em qualquer endereço que não seja de produto) o link é
+// montado pelo código: catálogo → /p/MLB…, anúncio → produto.mercadolivre.com.br/MLB-…
+function linkDoProduto(it) {
+  const cat = String(it?.produto || '').toUpperCase().match(/^MLB-?(\d{6,})$/);
+  if (cat) return `https://www.mercadolivre.com.br/p/MLB${cat[1]}`;
+  const item = String(it?.item || '').toUpperCase().match(/^MLB-?(\d{6,})$/);
+  return item ? `https://produto.mercadolivre.com.br/MLB-${item[1]}` : null;
+}
+const ehPaginaDeProduto = url => /^(produto\.|www\.)?mercadoli(vre|bre)\.com(\.br)?$/i.test(url.hostname)
+  && (/^produto\./i.test(url.hostname) || /\/(p|up)\/MLB/i.test(url.pathname) || /\/MLB-?\d{6,}/i.test(url.pathname));
+
+function urlDoAnuncio(url, item, it = null) {
+  if (!ehPaginaDeProduto(url)) return linkDoProduto(it || { item }) || `${url.origin}${url.pathname}`;
   const base = `${url.origin}${url.pathname}`;
   if (!/\/up\//i.test(url.pathname)) return base;
   const filtro = url.searchParams.get('pdp_filters') || (/^MLB\d{6,}$/i.test(String(item || '')) ? `item_id:${String(item).toUpperCase()}` : null);
@@ -151,7 +164,7 @@ function importarOfertas(itens) {
     const fim = fimLido > Date.now() && fimLido < Date.now() + 7 * 86400000 ? fimLido : resta > 0 && resta < 7 * 86400 ? Date.now() + resta * 1000 : 0;
     const deal = {
       store_product_id: `MLB${id[1]}`, produto: nome, preco_atual: atual, preco_anterior: anterior,
-      imagem: /^https:\/\//.test(it.imagem || '') ? it.imagem : null, original_url: urlDoAnuncio(url, it.item),
+      imagem: /^https:\/\//.test(it.imagem || '') ? it.imagem : null, original_url: urlDoAnuncio(url, it.item, it),
       ...(it.relampago ? { relampago: { fim } } : {}),
     };
     if (offers.saveDeal(ml, deal, { settings: s, manterCupom: true })) { out.gravados++; if (it.relampago) out.relampagos++; }
@@ -177,4 +190,28 @@ function encerrarRelampagos(vistos, completa = false) {
   return { encerradas };
 }
 
-module.exports = { salvarCupons, removerEsgotados, importarProdutos, importarOfertas, encerrarRelampagos, listar };
+// Ofertas do Mercado Livre gravadas com um link que não é de produto (anúncio patrocinado): troca pelo link do anúncio
+// e refaz o link de afiliado. Roda ao ligar o site.
+function consertarLinks() {
+  const rows = db.all(`SELECT id, store_product_id, original_url FROM offers WHERE store_id = 'mercadolivre'
+    AND original_url NOT LIKE 'https://produto.mercadolivre.com.br/%' AND original_url NOT LIKE 'https://www.mercadolivre.com.br/p/%'
+    AND original_url NOT LIKE 'https://www.mercadolivre.com.br/up/%'`);
+  let n = 0;
+  const s = settings.getAll();
+  db.transaction(() => {
+    for (const r of rows) {
+      let url;
+      try { url = new URL(r.original_url); } catch { url = null; }
+      if (url && ehPaginaDeProduto(url)) continue;
+      const novo = linkDoProduto({ item: r.store_product_id });
+      if (!novo) continue;
+      const afiliado = ml.affiliateLink({ ...r, original_url: novo }, s) || novo;
+      db.run('UPDATE offers SET original_url = ?, affiliate_url = ? WHERE id = ? AND aff_fixed = 0', novo, afiliado, r.id);
+      n++;
+    }
+  });
+  if (n) console.log(`[ML] ${n} oferta(s) com link de anúncio patrocinado consertadas`);
+  return n;
+}
+
+module.exports = { consertarLinks, urlDoAnuncio, salvarCupons, removerEsgotados, importarProdutos, importarOfertas, encerrarRelampagos, listar };
