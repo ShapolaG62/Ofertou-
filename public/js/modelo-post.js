@@ -9,13 +9,12 @@
     '*{{produto}}*',
     '',
     '❌ De ~R$ {{preco_de}}~',
-    '✅ *Por R$ {{preco}}* {{na_loja}}',
-    '💸 Você economiza *R$ {{economia}}* ({{desconto}}% off)',
+    '✅ *Por R$ {{preco}}* ({{desconto}}% off)',
+    '💸 Você economiza R$ {{economia}}',
+    '🏬 Loja: {{loja}}',
     '🎟️ Cupom: *{{cupom}}*',
     '',
-    '👉 {{link}}',
-    '',
-    '_Preço conferido em {{conferido}}. Pode mudar a qualquer momento._',
+    '🛒 Compre aqui: {{link}}',
   ].join('\n');
   const VARIAVEIS = ['produto', 'preco_de', 'preco', 'desconto', 'economia', 'loja', 'na_loja', 'link', 'cupom', 'conferido'];
   // Artigo de cada loja ("no Mercado Livre", "na Amazon"); loja parceira: "em <nome>"
@@ -23,7 +22,7 @@
   const naLoja = loja => (String(loja || '').trim() ? `${ARTIGO[String(loja).trim()] || 'em'} ${String(loja).trim()}` : '');
   // Os 3 modelos prontos para escolher (Painel → Redes sociais → Modelo da mensagem)
   const MODELOS = [
-    { id: 'padrao', nome: 'Padrão', desc: 'Completo: preço de antes e de agora, loja e quando foi conferido.', texto: PADRAO },
+    { id: 'padrao', nome: 'Padrão', desc: 'Completo: preço de antes e de agora, economia e loja.', texto: PADRAO },
     { id: 'direto', nome: 'Direto ao ponto', desc: 'Curto, para quem posta muitas ofertas por dia.', texto: [
       '🔥 *{{produto}}*',
       '💰 *R$ {{preco}}* ({{desconto}}% off) · {{loja}}',
