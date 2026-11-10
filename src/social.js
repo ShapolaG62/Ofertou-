@@ -280,6 +280,7 @@ function valoresDoModelo(o, link) {
   return {
     produto: tituloCurto(o.produto), preco_de: brl(o.preco_anterior), preco: brl(o.preco_atual),
     desconto: String(Math.round(o.desconto_pct)), economia: brl(Math.max(0, o.preco_anterior - o.preco_atual)),
+    relampago: require('../public/js/modelo-post').topoRelampago(o),
     loja: LOJAS_NOME[o.store_id] || o.plataforma, link, cupom: o.cupom || require('./cupons').paraPost(o.cupom_codigo, o.cupom_texto),
     conferido: seen && !isNaN(seen) ? seen.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '',
   };

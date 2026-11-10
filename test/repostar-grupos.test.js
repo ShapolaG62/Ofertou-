@@ -290,3 +290,28 @@ test('mensagem sem preço: busca na página da loja; palavra proibida e horário
     assert.match(enviados.at(-1).texto, /661/);
   } finally { amazon.lerProduto = ler; if (antesLista) settings.set('mineracao_palavras_proibidas', antesLista.join(', ')); }
 });
+
+test('botões do registro: Enviar no grupo posta a oferta barrada; Apagar e Apagar todas limpam o registro', async () => {
+  configurar({ repost_desconto_min: '50' });
+  repostar.receber(null, mensagem('Teclado Mecânico Repostar Botão\nDe R$ 200,00 Por R$ 150,00\nhttps://www.amazon.com.br/dp/B0REPOST20'));
+  await ate(() => registro().some(r => r.chave === 'amazon:B0REPOST20'));
+  const barrada = registro().find(r => r.chave === 'amazon:B0REPOST20');
+  assert.equal(barrada.situacao, 'ignorada');
+  assert.match(barrada.motivo, /abaixo do mínimo/);
+  const antes = enviados.length;
+  const r = await repostar.enviarDoRegistro(null, barrada.id);
+  assert.equal(r.ok, true);
+  assert.equal(enviados.length, antes + 1);
+  assert.equal(enviados.at(-1).destino, DESTINO);
+  assert.equal(db.get('SELECT situacao FROM repostar_registro WHERE id = ?', barrada.id).situacao, 'postada');
+  // Oferta relâmpago: o aviso vai no começo da mensagem
+  db.run(`UPDATE offers SET relampago_fim = datetime('now', '+2 hours'), relampago_tipo = 'loja' WHERE id = ?`, barrada.offer_id);
+  const texto = social.textoPadrao(db.get('SELECT * FROM offers WHERE id = ?', barrada.offer_id), settings.getAll());
+  assert.match(texto, /^⚡🔥 \*OFERTA RELÂMPAGO\* 🔥⚡/);
+  // Apagar uma e depois todas
+  assert.deepEqual(repostar.apagarRegistro(null, barrada.id), { apagadas: 1 });
+  assert.ok(registro().length > 0);
+  repostar.apagarRegistro(null);
+  assert.equal(registro().length, 0);
+  await assert.rejects(repostar.enviarDoRegistro(null, barrada.id), /não está mais no registro/);
+});

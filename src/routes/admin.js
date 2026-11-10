@@ -415,6 +415,11 @@ router.get('/api/admin/repostar/grupos', async (req, res) => {
     res.json({ grupos: todos.map(g => ({ id: g.id, nome: g.nome, membros: g.membros, meu: g.meu })) });
   } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
 });
+router.delete('/api/admin/repostar/registro', (req, res) => res.json(require('../repostar-grupos').apagarRegistro(null)));
+router.delete('/api/admin/repostar/registro/:id', (req, res) => res.json(require('../repostar-grupos').apagarRegistro(null, req.params.id)));
+router.post('/api/admin/repostar/registro/:id/enviar', async (req, res) => {
+  try { res.json(await require('../repostar-grupos').enviarDoRegistro(null, req.params.id)); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
+});
 router.post('/api/admin/repostar', async (req, res) => {
   try { res.json(await require('../repostar-grupos').salvar(null, req.body || {})); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
 });

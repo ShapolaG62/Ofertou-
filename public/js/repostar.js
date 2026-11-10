@@ -68,6 +68,8 @@
     .rp-tag.ignorada { background: var(--surface-3); color: var(--ink-2, var(--muted)); }
     .rp-tag.erro { background: color-mix(in srgb, var(--red, #c2341f) 15%, transparent); color: var(--red, #c2341f); }
     .rp-item small { color: var(--ink-3, var(--muted)); }
+    .rp-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .rp-acoes .btn { min-height: 36px; }
   </style>`);
 
   caixa.innerHTML = `
@@ -114,7 +116,7 @@
     <p class="hint cli-hint" id="rp-msg" role="status"></p>
 
     <div class="rp-secao">
-      <div class="rp-topo"><h3 style="margin:0">Últimas 24 horas</h3><button class="btn small" type="button" id="rp-atualizar">Atualizar</button></div>
+      <div class="rp-topo"><h3 style="margin:0">Últimas 24 horas</h3><span class="rp-barra"><button class="btn small" type="button" id="rp-atualizar">Atualizar</button><button class="btn small" type="button" id="rp-apagar-tudo">Apagar todas</button></span></div>
       <div class="rp-resumo" id="rp-resumo" style="margin-top:8px"></div>
       <p class="hint cli-hint" id="rp-recebidas" style="margin:10px 0 0"></p>
       <p class="hint cli-hint" id="rp-leitor" style="margin:6px 0 0"></p>
@@ -205,7 +207,8 @@
     ].map(([n, t]) => `<div class="rp-num"><b>${esc(n)}</b><span>${t}</span></div>`).join('');
     $('rp-registro').innerHTML = dados.registro.length ? dados.registro.map(x => `<div class="rp-item">
         <span class="rp-tag ${esc(x.situacao)}">${SITUACAO[x.situacao] || esc(x.situacao)}</span><small>${quando(x.created_at)}${x.origem ? ` · de ${esc(x.origem)}` : ''}${x.store_id ? ` · ${esc(LOJAS[x.store_id] || x.store_id)}` : ''}</small>
-        ${x.produto ? `<div><b>${esc(x.produto)}</b></div>` : ''}${x.motivo ? `<div><small>${esc(x.motivo)}</small></div>` : ''}${x.link && /^https?:\/\//.test(x.link) ? `<div><small><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.link.length > 70 ? `${x.link.slice(0, 70)}…` : x.link)}</a></small></div>` : ''}</div>`).join('')
+        ${x.produto ? `<div><b>${esc(x.produto)}</b></div>` : ''}${x.motivo ? `<div><small>${esc(x.motivo)}</small></div>` : ''}${x.link && /^https?:\/\//.test(x.link) ? `<div><small><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.link.length > 70 ? `${x.link.slice(0, 70)}…` : x.link)}</a></small></div>` : ''}
+        <div class="rp-acoes">${x.situacao !== 'postada' && (x.offer_id || x.link) ? `<button class="btn small btn-primary primary" type="button" data-rp-enviar="${x.id}">Enviar no grupo</button>` : ''}<button class="btn small" type="button" data-rp-apagar="${x.id}">Apagar</button></div></div>`).join('')
       : '<p class="hint cli-hint">Nenhuma oferta vista ainda. Quando chegar oferta nos grupos de origem, ela aparece aqui.</p>';
   }
   function preencher() {
@@ -234,6 +237,31 @@
     try { const d = await pedir(); dados.registro = d.registro; dados.resumo = d.resumo; dados.recebidas = d.recebidas; dados.leitor_ml = d.leitor_ml; desenharRegistro(); } catch { /* tenta de novo depois */ }
   }
   $('rp-atualizar').addEventListener('click', atualizarRegistro);
+  const confirmar = async texto => (window.OfertouUI?.confirmar ? window.OfertouUI.confirmar(texto, { titulo: 'Apagar', ok: 'Apagar', perigo: true }) : true);
+  const aviso = texto => { $('rp-msg').textContent = texto; $('rp-msg').scrollIntoView({ block: 'nearest' }); };
+  $('rp-apagar-tudo').addEventListener('click', async () => {
+    if (!dados?.registro?.length || !(await confirmar('Apagar todas as ofertas do registro? Isso não apaga nada dos grupos.'))) return;
+    try { await pedir('/registro', { method: 'DELETE' }); await atualizarRegistro(); aviso('Registro apagado.'); } catch (err) { aviso(err.message); }
+  });
+  // Botões de cada oferta: enviar agora no grupo (do jeito de sempre) ou apagar do registro
+  $('rp-registro').addEventListener('click', async e => {
+    const env = e.target.closest('[data-rp-enviar]'), apg = e.target.closest('[data-rp-apagar]');
+    if (!env && !apg) return;
+    const b = env || apg;
+    const id = b.dataset.rpEnviar || b.dataset.rpApagar;
+    const antes = b.textContent;
+    b.disabled = true;
+    b.textContent = env ? 'Enviando…' : 'Apagando…';
+    try {
+      if (env) { const r = await pedir(`/registro/${id}/enviar`, { method: 'POST', body: {} }); aviso(r.mensagem || 'Enviada.'); }
+      else await pedir(`/registro/${id}`, { method: 'DELETE' });
+      await atualizarRegistro();
+    } catch (err) {
+      b.disabled = false;
+      b.textContent = antes;
+      aviso(err.message);
+    }
+  });
   $('rp-ativo').addEventListener('change', () => { $('rp-ativo-txt').textContent = $('rp-ativo').checked ? 'Ligado (salve para valer)' : 'Desligado (salve para valer)'; });
   $('rp-salvar').addEventListener('click', async () => {
     const ids = papel => [...escolha.entries()].filter(([, v]) => v === papel).map(([id]) => id);

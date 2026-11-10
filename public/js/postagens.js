@@ -48,6 +48,7 @@
       desconto: String(Math.round(o.desconto_pct)), economia: brl(Math.max(0, o.preco_anterior - o.preco_atual)),
       loja: STORES[o.store_id] || o.plataforma, link: o.link, cupom: o.cupom || '',
       conferido: seen && !isNaN(seen) ? fmtWhen(seen) : '',
+      relampago: window.OfertouModelo.topoRelampago(o),
     });
   }
   const textOf = o => textos[o.id] ?? defaultText(o);

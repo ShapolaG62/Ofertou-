@@ -59,10 +59,28 @@
       if (!vazia) linhas.push(pronta);
     }
     // sem linhas em branco repetidas, nem no começo ou no fim
-    return linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    let texto = linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    // Oferta relâmpago no ar: o aviso vai no começo de toda mensagem (a não ser que o modelo já fale de relâmpago)
+    if (valores && valores.relampago && !/OFERTA REL[ÂA]MPAGO/i.test(texto)) texto = `${valores.relampago}\n\n${texto}`;
+    return texto;
   }
 
-  const api = { PADRAO, VARIAVEIS, MODELOS, aplicar };
+  // Topo da mensagem de uma oferta relâmpago que ainda está no ar ('' se não for relâmpago ou já acabou)
+  function topoRelampago(o, agora = Date.now()) {
+    if (!o || !o.relampago_fim) return '';
+    const fim = Date.parse(`${String(o.relampago_fim).replace(' ', 'T')}Z`);
+    if (!(fim > agora)) return '';
+    const linhas = ['⚡🔥 *OFERTA RELÂMPAGO* 🔥⚡'];
+    if (o.relampago_tipo && o.relampago_tipo !== 'loja') linhas.push('🚨 O preço caiu agora');
+    else if (o.relampago_fim_real) {
+      const br = new Date(fim - 3 * 3600000), hoje = new Date(agora - 3 * 3600000);
+      const hora = br.toISOString().slice(11, 16);
+      linhas.push(`⏰ Termina ${br.toISOString().slice(0, 10) === hoje.toISOString().slice(0, 10) ? `hoje às ${hora}` : `dia ${br.toISOString().slice(8, 10)}/${br.toISOString().slice(5, 7)} às ${hora}`}`);
+    }
+    return linhas.join('\n');
+  }
+
+  const api = { PADRAO, VARIAVEIS, MODELOS, aplicar, topoRelampago };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else raiz.OfertouModelo = api;
 })(typeof window !== 'undefined' ? window : globalThis);

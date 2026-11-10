@@ -170,8 +170,8 @@ test('texto da postagem: avisa o relâmpago, a hora do fim e leva o cupom', () =
   assert.match(t, /Termina hoje às|Termina dia/);
   assert.equal((t.match(/CUPOMX/g) || []).length >= 1, true);
   const queda = relampago.textoDaPostagem({ ...linha(id), relampago_tipo: 'queda', relampago_fim_real: 0, cupom_codigo: null, __link: 'https://x.test/l' }, settings.getAll());
-  assert.match(queda, /O PREÇO CAIU AGORA/);
-  assert.doesNotMatch(queda, /RELÂMPAGO|Termina/);
+  assert.match(queda, /OFERTA RELÂMPAGO[\s\S]*O preço caiu agora/);
+  assert.doesNotMatch(queda, /Termina/);
 });
 
 test('postar: respeita horário, palavras e grupos, um por vez, e não repete', async () => {

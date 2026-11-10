@@ -180,6 +180,11 @@ router.get('/api/cliente/repostar/grupos', async (req, res) => {
     res.json({ grupos: todos.map(g => ({ id: g.id, nome: g.nome, membros: g.membros, meu: g.meu })) });
   } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
 });
+router.delete('/api/cliente/repostar/registro', (req, res) => res.json(require('../repostar-grupos').apagarRegistro(req.cliente.id)));
+router.delete('/api/cliente/repostar/registro/:id', (req, res) => res.json(require('../repostar-grupos').apagarRegistro(req.cliente.id, req.params.id)));
+router.post('/api/cliente/repostar/registro/:id/enviar', async (req, res) => {
+  try { res.json(await require('../repostar-grupos').enviarDoRegistro(req.cliente.id, req.params.id)); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
+});
 router.post('/api/cliente/repostar', async (req, res) => {
   try { res.json(await require('../repostar-grupos').salvar(req.cliente.id, req.body || {})); } catch (err) { res.status(err.status || 400).json({ error: err.message }); }
 });

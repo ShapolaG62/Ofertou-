@@ -31,6 +31,8 @@ db.db.exec(`
 
 // Link do produto (sem o código de quem postou), para conferir depois por que uma oferta não foi repostada
 if (!db.all('PRAGMA table_info(repostar_registro)').some(c => c.name === 'link')) db.db.exec('ALTER TABLE repostar_registro ADD COLUMN link TEXT');
+// Grupo de origem (id), para o botão "Enviar no grupo" do registro mandar só aos destinos que recebem dele
+if (!db.all('PRAGMA table_info(repostar_registro)').some(c => c.name === 'grupo')) db.db.exec('ALTER TABLE repostar_registro ADD COLUMN grupo TEXT');
 
 const CHAVES = ['repost_ativo', 'repost_origens', 'repost_destinos', 'repost_por_tipo', 'repost_por_hora', 'repost_intervalo_min',
   'repost_desconto_min', 'repost_lojas', 'repost_inicio', 'repost_fim'];
@@ -146,10 +148,10 @@ async function salvar(cid, corpo = {}) {
 
 // ── Registro (o que aparece no painel) ───────────────────────────────────────
 function registrar(cid, item, dados) {
-  db.run(`INSERT INTO repostar_registro (cliente_id, origem, chave, produto, store_id, offer_id, situacao, motivo, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  db.run(`INSERT INTO repostar_registro (cliente_id, origem, chave, produto, store_id, offer_id, situacao, motivo, link, grupo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     cid ? Number(cid) : null, item?.origem || null, dados.chave || null, dados.produto ? String(dados.produto).slice(0, 200) : null,
     dados.store_id || null, dados.offer_id || null, dados.situacao, dados.motivo ? String(dados.motivo).slice(0, 300) : null,
-    item?.link ? String(item.link).slice(0, 500) : null);
+    item?.link ? String(item.link).slice(0, 500) : null, item?.grupo || null);
 }
 function painel(cid) {
   const s = configDe(cid);
@@ -276,8 +278,8 @@ async function ofertaDaMensagem(cid, item) {
   const chave = `${store.id}:${pid || crypto.createHash('sha1').update(limpo).digest('hex').slice(0, 16)}`;
   const dono = cid ? Number(cid) : null;
   // A mesma oferta costuma aparecer em vários grupos: trata uma vez (e não reposta o que já saiu nas últimas 24 h)
-  if (emAndamento.has(`${chaveDono(cid)}|${chave}`)
-    || db.get(`SELECT 1 FROM repostar_registro WHERE cliente_id IS ? AND chave = ? AND (created_at >= datetime('now', ?) OR (situacao = 'postada' AND created_at >= datetime('now', '-24 hours'))) LIMIT 1`,
+  if (!item.forcar && (emAndamento.has(`${chaveDono(cid)}|${chave}`))
+    || !item.forcar && db.get(`SELECT 1 FROM repostar_registro WHERE cliente_id IS ? AND chave = ? AND (created_at >= datetime('now', ?) OR (situacao = 'postada' AND created_at >= datetime('now', '-24 hours'))) LIMIT 1`,
       dono, chave, `-${JA_VISTA_MIN} minutes`)) return { silencio: true };
   emAndamento.add(`${chaveDono(cid)}|${chave}`);
   item.chave = chave;
@@ -302,7 +304,7 @@ async function ofertaDaMensagem(cid, item) {
   // do administrador lê a página e devolve nome, foto e preços (src/leitor-ml.js).
   if (!textoCompleto && store.id === 'mercadolivre' && pid) {
     const leitor = require('./leitor-ml');
-    const ml = await leitor.aguardar(pid, limpo);
+    const ml = await leitor.aguardar(pid, limpo, item.forcar ? 60000 : 180000); // pelo botão: espera menos
     if (ml?.disponivel === false) return { erro: 'O Mercado Livre informou que o anúncio não está mais disponível.', store, chave };
     if (ml?.preco && ml.preco_anterior > ml.preco) {
       const id = offers.saveDeal(store, { store_product_id: pid, produto: ml.produto, preco_atual: ml.preco, preco_anterior: ml.preco_anterior,
@@ -474,6 +476,57 @@ async function tratar(cid, item) {
   registrar(cid, item, { ...base, produto: o.produto, offer_id: o.id, situacao: ok ? 'postada' : 'erro', motivo: resultados.map(x => x.mensagem).join(' | ') });
 }
 
+// ── Botões do registro ───────────────────────────────────────────────────────
+const falha = (msg, status = 400) => Object.assign(new Error(msg), { status });
+
+// Apaga uma linha do registro (id) ou todo o registro do dono (sem id)
+function apagarRegistro(cid, id = null) {
+  const dono = cid ? Number(cid) : null;
+  const r = id ? db.run('DELETE FROM repostar_registro WHERE id = ? AND cliente_id IS ?', Number(id), dono)
+    : db.run('DELETE FROM repostar_registro WHERE cliente_id IS ?', dono);
+  return { apagadas: r.changes };
+}
+
+// "Enviar no grupo": posta agora, do jeito de sempre (modelo de mensagem, link de afiliado, grupos de destino que recebem
+// daquela origem), sem as regras que tinham barrado a oferta. Sem a oferta lida, tenta ler de novo na loja.
+async function enviarDoRegistro(cid, id) {
+  const dono = cid ? Number(cid) : null;
+  const row = db.get('SELECT * FROM repostar_registro WHERE id = ? AND cliente_id IS ?', Number(id), dono);
+  if (!row) throw falha('Esta oferta não está mais no registro.', 404);
+  const s = configDe(cid);
+  const a = ajustes(s);
+  const item = { urls: row.link ? [row.link] : [], texto: '', origem: row.origem, grupo: row.grupo, link: row.link, chegou: Date.now(), forcar: true };
+  let o = row.offer_id && db.get('SELECT * FROM offers WHERE id = ?', row.offer_id);
+  if (!o) {
+    if (!row.link) throw falha('Esta mensagem não tinha link de produto: não há o que enviar.');
+    const r = await ofertaDaMensagem(cid, item).finally(() => { if (item.chave) emAndamento.delete(`${chaveDono(cid)}|${item.chave}`); });
+    if (r.erro || !r.o) throw falha(r.erro || 'Não consegui ler esta oferta na loja.');
+    o = db.get('SELECT * FROM offers WHERE id = ?', r.o.id);
+  }
+  const whatsapp = require('./whatsapp');
+  const social = require('./social');
+  const salvos = new Set(gruposDestino(s).map(g => g.id));
+  const destinos = a.destinos.filter(d => salvos.has(d.id) && (!row.grupo || !d.origens || d.origens.includes(row.grupo)));
+  if (!destinos.length) throw falha('Nenhum grupo de destino marcado para receber desta origem. Marque em "Para onde vai".');
+  const sDestino = whatsapp.comDestinos(s, destinos, a.por_tipo);
+  if (!whatsapp.gruposDaOferta(sDestino, o.categoria, o.store_id).length) throw falha('Nenhum grupo de destino recebe ofertas deste tipo e desta loja.');
+  let foto = null;
+  const endereco = social.postImage(o, s);
+  if (endereco) { try { foto = await whatsapp.fotoParaEnvio(endereco); } catch (err) { log(`foto da loja recusada (${err.message})`); } }
+  const link = cid ? await require('./clientes').linkParaPostar(cid, o, s) : null;
+  if (link) o.__link = link;
+  o.__link = require('./encurtador').curto(social.postLink(o, s));
+  const texto = social.textoPadrao(o, s);
+  const resultados = await social.publicar(o.id, ['whatsapp'], texto, `repostagem manual (${row.origem || 'outro grupo'})`, { s: sDestino, ...(foto ? { foto } : {}), ...(cid ? { clienteId: cid, link } : {}) });
+  const ok = resultados.some(x => x.ok);
+  const motivo = resultados.map(x => x.mensagem).join(' | ').slice(0, 300);
+  db.run('UPDATE repostar_registro SET situacao = ?, motivo = ?, produto = ?, offer_id = ?, store_id = ? WHERE id = ?',
+    ok ? 'postada' : 'erro', `Enviada pelo botão: ${motivo}`, String(o.produto).slice(0, 200), o.id, o.store_id, row.id);
+  if (!ok) throw falha(motivo || 'O envio falhou.', 502);
+  ultimaPostagem.set(chaveDono(cid), Date.now());
+  return { ok: true, mensagem: motivo };
+}
+
 function iniciar() {
   limpar();
   require('./leitor-ml').limpar();
@@ -487,4 +540,4 @@ const _paraTestes = ({ pausa, zerar } = {}) => {
 };
 const ocupado = cid => trabalhando.has(chaveDono(cid));
 
-module.exports = { CHAVES, receber, naoLida, salvar, painel, limparLink, linksDa, ajustes, iniciar, ocupado, _paraTestes };
+module.exports = { CHAVES, receber, naoLida, salvar, apagarRegistro, enviarDoRegistro, painel, limparLink, linksDa, ajustes, iniciar, ocupado, _paraTestes };

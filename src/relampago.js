@@ -101,9 +101,11 @@ function textoDaPostagem(o, s) {
     const nome = cupons.ehMl(o.cupom_codigo) ? (o.cupom_texto || 'cupom') : o.cupom_codigo;
     if (!t.includes(nome)) t = `${t}\n\n🏷️ *Cupom:* ${cupons.paraPost(o.cupom_codigo, o.cupom_texto)}`;
   }
+  // O topo "OFERTA RELÂMPAGO" vem do modelo da mensagem (vale em todos os envios); aqui só se o modelo não trouxe
+  if (/OFERTA REL[ÂA]MPAGO/i.test(t)) return t;
   const topo = o.relampago_tipo === 'loja'
-    ? `⚡ *OFERTA RELÂMPAGO* ⚡${o.relampago_fim_real ? `\n⏰ Termina ${terminaEm(o.relampago_fim)}` : ''}`
-    : '🚨 *O PREÇO CAIU AGORA* 🚨';
+    ? `⚡🔥 *OFERTA RELÂMPAGO* 🔥⚡${o.relampago_fim_real ? `\n⏰ Termina ${terminaEm(o.relampago_fim)}` : ''}`
+    : '⚡🔥 *OFERTA RELÂMPAGO* 🔥⚡\n🚨 O preço caiu agora';
   return `${topo}\n\n${t}`;
 }
 

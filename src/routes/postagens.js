@@ -118,7 +118,7 @@ router.get('/api/postagens/ofertas', async (req, res) => {
   const cid = req.poster.clienteId;
   const rows = db.all(
     `SELECT id, store_id, store_product_id, plataforma, produto, preco_atual, preco_anterior, desconto_pct, categoria, imagem, fonte, loja_id,
-            affiliate_url, original_url, last_seen_at, oculto, expires_at, cupom_codigo, cupom_texto
+            affiliate_url, original_url, last_seen_at, oculto, expires_at, cupom_codigo, cupom_texto, relampago_fim, relampago_tipo, relampago_fim_real
      FROM offers WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids);
   const hist = social.historico(ids, cid);
   const out = [];
