@@ -30,12 +30,11 @@
       '🎟️ Cupom: *{{cupom}}*',
       '👉 {{link}}',
     ].join('\n') },
-    { id: 'chamativo', nome: 'Chamativo', desc: 'Abre com o desconto em destaque e mostra a economia.', texto: [
+    { id: 'chamativo', nome: 'Chamativo', desc: 'Nome do produto em cima, o desconto em destaque no meio e a economia.', texto: [
+      '🛍️ *{{produto}}*',
+      '',
+      '❌ De ~R$ {{preco_de}}~',
       '🚨 *{{desconto}}% OFF {{na_loja}}*',
-      '',
-      '🛍️ {{produto}}',
-      '',
-      '~De R$ {{preco_de}}~',
       '🤑 *Por R$ {{preco}}*',
       '💸 Você economiza *R$ {{economia}}*',
       '🎟️ Use o cupom: *{{cupom}}*',

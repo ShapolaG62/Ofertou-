@@ -61,7 +61,7 @@
     .rp-num { padding: 10px 12px; border: 1px solid var(--line, var(--border)); border-radius: 10px; background: var(--surface-2); }
     .rp-num b { display: block; font-size: 20px; }
     .rp-num span { font-size: 12px; color: var(--ink-3, var(--muted)); }
-    .rp-reg { display: grid; gap: 6px; margin-top: 10px; }
+    .rp-reg { display: grid; gap: 6px; margin-top: 10px; max-height: 520px; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
     .rp-item { padding: 8px 10px; border: 1px solid var(--line, var(--border)); border-radius: 10px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
     .rp-item .rp-tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; margin-right: 6px; }
     .rp-tag.postada { background: color-mix(in srgb, var(--brand, var(--green)) 18%, transparent); color: var(--brand, var(--green)); }
