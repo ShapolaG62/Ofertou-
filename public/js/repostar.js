@@ -14,6 +14,7 @@
   const nomes = new Map();
   const recebe = new Map();    // grupo de destino → Set das origens de que ele recebe
   let dados = null;
+  let abaReg = 'pendentes'; // aba do registro: 'pendentes' (para enviar) ou 'postadas'
 
   async function pedir(caminho = '', opcoes = {}) {
     const r = await fetch(BASE + caminho, {
@@ -68,6 +69,11 @@
     .rp-tag.ignorada { background: var(--surface-3); color: var(--ink-2, var(--muted)); }
     .rp-tag.erro { background: color-mix(in srgb, var(--red, #c2341f) 15%, transparent); color: var(--red, #c2341f); }
     .rp-item small { color: var(--ink-3, var(--muted)); }
+    .rp-abas { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    .rp-abas button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 99px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--line-strong, var(--border-strong)); background: transparent; color: var(--ink, var(--text)); }
+    .rp-abas button b { font-size: 12px; padding: 1px 7px; border-radius: 99px; background: var(--surface-3, var(--surface-2)); }
+    .rp-abas button[aria-selected="true"] { border-color: var(--brand, var(--green)); background: color-mix(in srgb, var(--brand, var(--green)) 14%, transparent); }
     .rp-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .rp-acoes .btn { min-height: 36px; }
   </style>`);
@@ -120,6 +126,10 @@
       <div class="rp-resumo" id="rp-resumo" style="margin-top:8px"></div>
       <p class="hint cli-hint" id="rp-recebidas" style="margin:10px 0 0"></p>
       <p class="hint cli-hint" id="rp-leitor" style="margin:6px 0 0"></p>
+      <div class="rp-abas" role="tablist" aria-label="Ofertas do registro">
+        <button type="button" role="tab" data-rp-aba="pendentes" aria-selected="true">Para enviar <b id="rp-n-pendentes">0</b></button>
+        <button type="button" role="tab" data-rp-aba="postadas" aria-selected="false">Postadas <b id="rp-n-postadas">0</b></button>
+      </div>
       <div class="rp-reg" id="rp-registro"></div>
     </div>`;
   const $ = id => document.getElementById(id);
@@ -205,11 +215,19 @@
     $('rp-resumo').innerHTML = [
       [r.postadas, 'postadas'], [r.ignoradas, 'não postadas'], [r.erros, 'falharam'], [`${r.ultima_hora}/${dados.ajustes.por_hora}`, 'na última hora'],
     ].map(([n, t]) => `<div class="rp-num"><b>${esc(n)}</b><span>${t}</span></div>`).join('');
-    $('rp-registro').innerHTML = dados.registro.length ? dados.registro.map(x => `<div class="rp-item">
+    // Duas abas: as que ainda não foram para o grupo (com o botão de enviar) e as postadas
+    const postadas = dados.registro.filter(x => x.situacao === 'postada');
+    const pendentes = dados.registro.filter(x => x.situacao !== 'postada');
+    $('rp-n-pendentes').textContent = pendentes.length;
+    $('rp-n-postadas').textContent = postadas.length;
+    caixa.querySelectorAll('[data-rp-aba]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.rpAba === abaReg)));
+    const lista = abaReg === 'postadas' ? postadas : pendentes;
+    $('rp-registro').innerHTML = lista.length ? lista.map(x => `<div class="rp-item">
         <span class="rp-tag ${esc(x.situacao)}">${SITUACAO[x.situacao] || esc(x.situacao)}</span><small>${quando(x.created_at)}${x.origem ? ` · de ${esc(x.origem)}` : ''}${x.store_id ? ` · ${esc(LOJAS[x.store_id] || x.store_id)}` : ''}</small>
         ${x.produto ? `<div><b>${esc(x.produto)}</b></div>` : ''}${x.motivo ? `<div><small>${esc(x.motivo)}</small></div>` : ''}${x.link && /^https?:\/\//.test(x.link) ? `<div><small><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.link.length > 70 ? `${x.link.slice(0, 70)}…` : x.link)}</a></small></div>` : ''}
         <div class="rp-acoes">${x.situacao !== 'postada' && (x.offer_id || x.link) ? `<button class="btn small btn-primary primary" type="button" data-rp-enviar="${x.id}">Enviar no grupo</button>` : ''}<button class="btn small" type="button" data-rp-apagar="${x.id}">Apagar</button></div></div>`).join('')
-      : '<p class="hint cli-hint">Nenhuma oferta vista ainda. Quando chegar oferta nos grupos de origem, ela aparece aqui.</p>';
+      : `<p class="hint cli-hint">${!dados.registro.length ? 'Nenhuma oferta vista ainda. Quando chegar oferta nos grupos de origem, ela aparece aqui.'
+        : abaReg === 'postadas' ? 'Nenhuma oferta postada nas últimas 24 horas.' : 'Nenhuma oferta esperando envio.'}</p>`;
   }
   function preencher() {
     const a = dados.ajustes;
@@ -237,6 +255,7 @@
     try { const d = await pedir(); dados.registro = d.registro; dados.resumo = d.resumo; dados.recebidas = d.recebidas; dados.leitor_ml = d.leitor_ml; desenharRegistro(); } catch { /* tenta de novo depois */ }
   }
   $('rp-atualizar').addEventListener('click', atualizarRegistro);
+  caixa.querySelectorAll('[data-rp-aba]').forEach(b => b.addEventListener('click', () => { abaReg = b.dataset.rpAba; if (dados) desenharRegistro(); }));
   const confirmar = async texto => (window.OfertouUI?.confirmar ? window.OfertouUI.confirmar(texto, { titulo: 'Apagar', ok: 'Apagar', perigo: true }) : true);
   const aviso = texto => { $('rp-msg').textContent = texto; $('rp-msg').scrollIntoView({ block: 'nearest' }); };
   $('rp-apagar-tudo').addEventListener('click', async () => {

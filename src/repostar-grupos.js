@@ -158,7 +158,7 @@ function painel(cid) {
   const a = ajustes(s);
   const dono = cid ? Number(cid) : null;
   const registro = db.all(`SELECT r.id, r.origem, r.produto, r.store_id, r.offer_id, r.situacao, r.motivo, r.link, r.created_at FROM repostar_registro r
-    WHERE r.cliente_id IS ? ORDER BY r.id DESC LIMIT 40`, dono);
+    WHERE r.cliente_id IS ? ORDER BY r.id DESC LIMIT 150`, dono);
   const hoje = db.get(`SELECT SUM(situacao = 'postada') AS postadas, SUM(situacao = 'ignorada') AS ignoradas, SUM(situacao = 'erro') AS erros
     FROM repostar_registro WHERE cliente_id IS ? AND created_at >= datetime('now', '-24 hours')`, dono) || {};
   const semAfiliado = require('./clientes').lojasSemAfiliado(s);
