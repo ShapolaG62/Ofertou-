@@ -214,6 +214,17 @@ async function minerarBuscas(site, cab) {
 const ligarLeitor = () => chrome.alarms.create(ALARME_LEITOR, { periodInMinutes: 1 });
 chrome.runtime.onInstalled.addListener(ligarLeitor);
 chrome.runtime.onStartup.addListener(ligarLeitor);
+// O alarme pode sumir (extensão atualizada por cima da pasta, Chrome que não avisou a instalação): toda vez que esta parte
+// acorda, confere se ele existe e liga de novo se faltar
+const garantirLeitor = () => chrome.alarms.get(ALARME_LEITOR).then(a => { if (!a) ligarLeitor(); }).catch(ligarLeitor);
+garantirLeitor();
+// O Painel foi aberto: confere o alarme e lê a fila na hora
+chrome.runtime.onMessage.addListener((m, sender) => {
+  if (sender.id !== chrome.runtime.id || m?.tipo !== 'acordar-leitor') return false;
+  garantirLeitor();
+  lerFilaDoSite().catch(() => {});
+  return false;
+});
 chrome.alarms.onAlarm.addListener(a => { if (a.name === ALARME_LEITOR) lerFilaDoSite().catch(() => {}); });
 // O Painel acabou de entregar a chave: lê a fila na hora, sem esperar o minuto
 chrome.storage.onChanged.addListener(m => { if (m.leitorChave) { ligarLeitor(); lerFilaDoSite().catch(() => {}); } });

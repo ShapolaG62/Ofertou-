@@ -10,7 +10,11 @@
   if (window === window.top) {
     fetch('/api/admin/extensao/leitor', { cache: 'no-store', credentials: 'same-origin' })
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.chave) chrome.storage.local.set({ leitorChave: d.chave, leitorSite: ORIGEM }); })
+      .then(async d => {
+        if (!d?.chave) return;
+        await chrome.storage.local.set({ leitorChave: d.chave, leitorSite: ORIGEM });
+        chrome.runtime.sendMessage({ tipo: 'acordar-leitor' }).catch(() => {}); // liga a leitura e a mineração do ML
+      })
       .catch(() => {});
   }
 
