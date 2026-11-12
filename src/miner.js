@@ -110,6 +110,8 @@ async function minerarTermo(query) {
   const ligadas = settings.getEnabledStores();
   const cat = (settings.getSearchTerms().find(t => t.query === query) || {}).cat || null;
   const lojas = STORES.filter(st => st.automatic && ligadas[st.id] !== false && st.isReady(s).ready);
+  // Anúncios comuns do Mercado Livre (a API só lê o catálogo): a extensão do Chrome busca o termo no próximo minuto
+  if (ligadas.mercadolivre !== false) require('./mineracao-ml-chrome').priorizar(query);
   const r = await Promise.all(lojas.map(async store => {
     try {
       const espera = new Promise((_, nao) => setTimeout(() => nao(new Error('demorou demais')), 90 * 1000).unref?.());

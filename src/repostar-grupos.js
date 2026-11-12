@@ -336,7 +336,7 @@ function barrar(cid, s, a, o) {
   if (Number(o.desconto_pct) < a.desconto_min) return `Desconto de ${Math.round(o.desconto_pct)}%, abaixo do mínimo de ${a.desconto_min}%.`;
   // As palavras proibidas e as do agendamento não valem aqui: o que chega dos grupos de origem é repostado
   const rep = require('./agenda').regraDeRepeticao(cid);
-  if (rep.porOferta(o) || rep.porProduto(o)) return 'Este produto já foi postado nos últimos 7 dias e o preço não caiu 10%.';
+  if (rep.porOferta(o) || rep.porProduto(o)) return 'Este produto já foi postado nos grupos nos últimos 30 dias: só produto novo vai para os grupos.';
   return null;
 }
 
@@ -404,7 +404,7 @@ function trabalhar(cid) {
   (async () => {
     try {
       let item;
-      while ((item = filas.get(k)?.shift())) {
+      while ((item = filas.get(k)?.pop())) { // a mais nova primeiro: as antigas podem ter acabado
         try { await tratar(cid, item); } catch (err) {
           log(`${cid ? `cliente ${cid}` : 'site'}: ${err.message}`);
           registrar(cid, item, { chave: item.chave, situacao: 'erro', motivo: err.message });

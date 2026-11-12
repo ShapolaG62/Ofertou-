@@ -126,7 +126,7 @@ function* montagem() {
     brutas.push(...db.all(
       `SELECT o.id, o.store_id, o.plataforma, o.produto, o.preco_atual, o.preco_anterior, o.desconto_pct, o.categoria,
          o.subcategoria, o.link_clicks, o.fonte, o.created_at, o.last_seen_at, o.comissao_pct, o.comissao_extra_pct,
-         o.cupom_codigo, o.cupom_texto, o.preco_sem_cupom, o.relampago_fim, o.relampago_tipo, o.relampago_fim_real, l.slug AS loja_slug
+         o.cupom_codigo, o.cupom_texto, o.preco_sem_cupom, o.relampago_fim, o.relampago_tipo, o.relampago_fim_real, o.vendidos, o.avaliacao, l.slug AS loja_slug
        FROM offers o LEFT JOIN lojas l ON l.id = o.loja_id WHERE o.id > ? AND o.id <= ? AND ${active.sql}`, de, de + PASSO_ID, ...active.params));
     yield;
   }
@@ -165,7 +165,7 @@ function* montagem() {
       comissao_pct: o.comissao_pct ?? null, comissao_extra_pct: o.comissao_extra_pct > 0 ? o.comissao_extra_pct : 0,
       ...(o.cupom_codigo ? { cupom: o.cupom_codigo, cupom_texto: o.cupom_texto, preco_sem_cupom: o.preco_sem_cupom } : {}),
       ...(o.relampago_fim ? { relampago_fim: o.relampago_fim, relampago_tipo: o.relampago_tipo, relampago_fim_real: o.relampago_fim_real } : {}),
-      _n: n, _k: m.k, _t: m.t, _c: c, _alta: m.alta, _acess: m.acess, _susp: suspeita(o, h, n),
+      _n: n, _k: m.k, _t: m.t, _c: c, _alta: m.alta, _acess: m.acess, _susp: suspeita(o, h, n), _v: o.vendidos ?? null, _a: o.avaliacao ?? null,
     };
   };
   const rows = [];
@@ -202,7 +202,7 @@ function* montagem() {
   } };
   return CACHE;
 }
-const publico = o => { const { _n, _k, _t, _c, _s, _alta, _acess, _susp, ...r } = o; return r; };
+const publico = o => { const { _n, _k, _t, _c, _s, _alta, _acess, _susp, _v, _a, ...r } = o; return r; };
 // Quem visita não vê a comissão de afiliado (só o admin e os afiliados com a ferramenta de postagem)
 const semComissao = o => { const { comissao_pct, comissao_extra_pct, ...r } = publico(o); return r; };
 
@@ -590,4 +590,4 @@ function suspeitas(limite = 200) {
   return { total: l.length, itens: l.sort((a, b) => b.desconto_pct - a.desconto_pct).slice(0, limite).map(o => ({ ...publico(o), motivo: o._susp })) };
 }
 
-module.exports = { CATEGORIAS, buscar, mix, aquecer, montar, pronta, aguardar, atualizar, ativas, suspeitas, paraPostar, POR_PAGINA };
+module.exports = { CATEGORIAS, EM_ALTA, ACESSORIO, LOJA_CONFIANCA, buscar, mix, aquecer, montar, pronta, aguardar, atualizar, ativas, suspeitas, paraPostar, POR_PAGINA };

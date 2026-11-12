@@ -671,6 +671,16 @@ const STATUS_LABEL = {
 };
 let pollTimer = null;
 
+// Anúncios comuns do Mercado Livre (fora do catálogo), buscados pela extensão no Chrome do administrador
+function mlChromeLinha(m) {
+  let texto, ruim = false;
+  if (!m.ligada) texto = 'Desligada.';
+  else if (!m.ativa) { texto = 'Parada: abra o Chrome com a extensão do Ofertou! e entre no Painel uma vez. Sem ela, só entram os produtos de catálogo do Mercado Livre.'; ruim = true; }
+  else if (m.erro) { texto = `Problema na última busca: ${m.erro}. Abra o Mercado Livre neste Chrome e confira se está logado.`; ruim = true; }
+  else texto = m.ultima ? `Ligada, buscando os ${m.termos} termos em rodízio · ${m.gravadas} ofertas gravadas de ${m.encontradas} lidas · último termo "${m.ultimo_termo}" em ${fmtDate(m.ultima.replace('T', ' ').slice(0, 19))}` : 'Ligada, esperando a primeira busca.';
+  return `<tr class="tab-msg"><td colspan="5" class="${ruim ? 'ruim' : ''}">🧩 Anúncios comuns pelo seu Chrome: ${esc(texto)}</td></tr>`;
+}
+
 async function loadStores() {
   const st = await api('/api/admin/stores');
   CATEGORIES = st.categories;
@@ -687,7 +697,8 @@ async function loadStores() {
       <td class="num" data-l="Última execução">${s.automatic ? fmtDate(s.last_run_at) : '—'}</td>
       <td class="num" data-l="Gravadas">${s.automatic ? `${s.saved || 0} de ${s.found || 0}` : '—'}</td>
       <td class="num" data-l="Último sucesso">${s.automatic ? fmtDate(s.last_success_at) : '—'}</td></tr>
-      ${s.message ? `<tr class="tab-msg"><td colspan="5" class="${status === 'ok' ? '' : 'ruim'}">${esc(s.message)}</td></tr>` : ''}`;
+      ${s.message ? `<tr class="tab-msg"><td colspan="5" class="${status === 'ok' ? '' : 'ruim'}">${esc(s.message)}</td></tr>` : ''}
+      ${s.id === 'mercadolivre' && st.ml_chrome ? mlChromeLinha(st.ml_chrome) : ''}`;
   }).join('')}</tbody></table>`;
   const lr = st.lastRun;
   $('#last-run').textContent = st.parando ? 'Parando a mineração… (termina a busca que está no meio)' : st.running ? 'Mineração em andamento...' :

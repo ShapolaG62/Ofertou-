@@ -148,7 +148,8 @@ router.get('/api/admin/dashboard', (req, res, next) => require('../busca-ofertas
 
 // ── Lojas e mineração ─────────────────────────────────────────────────────────
 router.get('/api/admin/stores', (req, res) => {
-  res.json({ ...miner.getState(), enabled: settings.getEnabledStores(), categories: CATEGORIES, cupons: require('../cupons').resumo() });
+  res.json({ ...miner.getState(), enabled: settings.getEnabledStores(), categories: CATEGORIES, cupons: require('../cupons').resumo(),
+    ml_chrome: require('../mineracao-ml-chrome').estado() });
 });
 
 router.post('/api/admin/mine/parar', (req, res) => res.json(miner.pararMineracao()));
@@ -163,6 +164,8 @@ router.post('/api/admin/mine', async (req, res) => {
     return res.status(409).json({ error: 'A mineração automática está rodando agora (lote de termos). Tente de novo em alguns minutos.' });
   }
   if (query) {
+    // Anúncios comuns do Mercado Livre: a extensão do Chrome busca este termo no próximo minuto
+    if (!lojaDoLink && (!storeIds || storeIds.includes('mercadolivre'))) require('../mineracao-ml-chrome').priorizar(query);
     // Busca pontual: espera o resultado para mostrar na tela.
     return res.json(await miner.runMining({ query, storeIds, escolhidas: Boolean(storeIds) }));
   }

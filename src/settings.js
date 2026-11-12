@@ -153,6 +153,10 @@ const DEFAULTS = {
   agenda_qtd: '5',
   agenda_redes: '["whatsapp"]',
   agenda_completar: '1',        // completa a fila com as melhores ofertas do momento
+  agenda_novas_horas: '24',     // só produto novo: encontrado nas últimas X horas (0 = qualquer um ainda não postado)
+  agenda_fila_horas: '6',       // oferta que espera mais que isso na fila sai (pode ter mudado ou acabado)
+  agenda_fila_max: '20',        // passando disso, saem da fila as mais antigas
+  agenda_nota_minima: '60',     // só vai para os grupos oferta com nota de viral a partir disso (src/nota-grupos.js)
   // Modo contínuo: entre o início e o fim, uma postagem a cada X a Y minutos (intervalo aleatório, parece gente)
   agenda_modo: 'horarios',      // 'horarios' (nos horários fixos) ou 'continuo'
   agenda_inicio: '08:00',

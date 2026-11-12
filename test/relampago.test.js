@@ -189,6 +189,7 @@ test('postar: respeita horário, palavras e grupos, um por vez, e não repete', 
   settings.set('agenda_inicio', '00:00');
   settings.set('agenda_fim', '23:59');
   settings.set('agenda_palavras_bloqueadas', 'capinha');
+  settings.set('agenda_nota_minima', '0'); // a nota de viral tem testes próprios
   settings.set('agenda_palavras_permitidas', '');
   settings.set('whatsapp_groups', JSON.stringify([{ id: 'g1', nome: 'Grupo', categorias: [cat], lojas: ['kabum'] }]));
   const fim = Date.now() + 3 * 3600000;
@@ -197,13 +198,16 @@ test('postar: respeita horário, palavras e grupos, um por vez, e não repete', 
   const proibida = salvar(kabum, base({ produto: 'Capinha categoria', relampago: { fim } }));
   const outraLoja = salvar(amazon, base({ store_product_id: 'B00000000X', produto: 'Item categoria amazon', relampago: { fim } }));
   const acabando = salvar(kabum, base({ produto: 'Item quase no fim', relampago: { fim: Date.now() + 5 * 60000 } }));
-  for (const id of [boa, boa2, proibida, outraLoja, acabando]) db.run('UPDATE offers SET categoria = ? WHERE id = ?', cat, id);
+  // Produto que já existia e só teve o preço caído: o site atualiza o preço, mas não vai para os grupos
+  const caiu = salvar(kabum, base({ produto: 'Item categoria preco caiu' }));
+  db.run(`UPDATE offers SET relampago_tipo = 'queda', relampago_fim = datetime('now', '+6 hours'), relampago_desde = datetime('now') WHERE id = ?`, caiu);
+  for (const id of [boa, boa2, proibida, outraLoja, acabando, caiu]) db.run('UPDATE offers SET categoria = ? WHERE id = ?', cat, id);
   try {
     await relampago.despacharDono(null, new Set());
     assert.equal(postados.length, 1, 'uma por vez');
     assert.match(postados[0].texto, /OFERTA RELÂMPAGO/);
     const fila = db.all(`SELECT offer_id, status, prioridade FROM post_queue`);
-    assert.deepEqual(fila.map(q => q.offer_id).sort(), [boa, boa2].sort(), 'só as que passam pelos filtros e pelos grupos');
+    assert.deepEqual(fila.map(q => q.offer_id).sort(), [boa, boa2].sort(), 'só as que passam pelos filtros e pelos grupos (queda de preço não entra)');
     await relampago.despacharDono(null, new Set());
     assert.equal(postados.length, 1, 'espera o intervalo');
     db.run(`UPDATE post_queue SET posted_at = datetime('now', '-10 minutes') WHERE status = 'postado'`);

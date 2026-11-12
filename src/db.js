@@ -161,6 +161,9 @@ if (!offerColumns.includes('comissao_extra_pct')) db.exec('ALTER TABLE offers AD
 if (!offerColumns.includes('cupom_codigo')) db.exec('ALTER TABLE offers ADD COLUMN cupom_codigo TEXT');
 if (!offerColumns.includes('cupom_texto')) db.exec('ALTER TABLE offers ADD COLUMN cupom_texto TEXT');
 if (!offerColumns.includes('preco_sem_cupom')) db.exec('ALTER TABLE offers ADD COLUMN preco_sem_cupom REAL');
+// Prova social informada pela loja (Shopee e busca do Mercado Livre): quantos já venderam e a nota das avaliações (0 a 5)
+if (!offerColumns.includes('vendidos')) db.exec('ALTER TABLE offers ADD COLUMN vendidos INTEGER');
+if (!offerColumns.includes('avaliacao')) db.exec('ALTER TABLE offers ADD COLUMN avaliacao REAL');
 if (!offerColumns.includes('loja_id')) {
   db.exec('ALTER TABLE offers ADD COLUMN loja_id INTEGER REFERENCES lojas(id) ON DELETE CASCADE');
 }

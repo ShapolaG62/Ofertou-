@@ -75,6 +75,8 @@ app.use(['/api/cliente/comissao/previa', '/api/cliente/comissao/importar'], expr
 // A coleta do Mercado Livre entrega milhares de cupons e produtos em lotes grandes: limite maior só para o admin logado
 const jsonMineracao = express.json({ limit: '5mb' });
 app.use(['/api/admin/mineracao', '/api/admin/ganhos/portal'], (req, res, next) => (auth.isLoggedIn(req) ? jsonMineracao(req, res, next) : next()));
+// Página de busca do Mercado Livre trazida pela extensão do Chrome (a chave da extensão é conferida na própria rota)
+app.use('/api/extensao/ml-busca', express.json({ limit: '5mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 // Login obrigatório para ver as ofertas (configurável no painel).
@@ -321,6 +323,10 @@ app.use('/uploads', express.static(UPLOADS_DIR, {
   const comChave = (req, res, next) => (leitor.chaveConfere(req.get('x-ofertou-chave')) ? next() : res.status(401).json({ error: 'Chave da extensão inválida.' }));
   app.get('/api/extensao/ml-pendentes', comChave, (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ itens: leitor.pendentes() }); });
   app.post('/api/extensao/ml-lidos', comChave, (req, res) => res.json(leitor.receber(req.body?.itens)));
+  // Mineração do Mercado Livre pelo Chrome (src/mineracao-ml-chrome.js): termos para buscar e a página de cada busca
+  const mlChrome = require('./src/mineracao-ml-chrome');
+  app.get('/api/extensao/ml-buscas', comChave, (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ buscas: mlChrome.proximos() }); });
+  app.post('/api/extensao/ml-busca', comChave, (req, res) => res.json(mlChrome.receber(req.body || {})));
 }
 app.use(publicRoutes);
 app.use(adminRoutes);

@@ -9,7 +9,7 @@ const ENDPOINT = 'https://open-api.affiliate.shopee.com.br/graphql';
 // como "infantil" ou "vestido" têm milhares de anúncios e só a 1ª página deixava muita oferta de fora.
 const LISTAS = [{ sortType: 1, page: 1 }, { sortType: 1, page: 2 }, { sortType: 2, page: 1 }];
 
-const CAMPOS = 'itemId productName priceMin priceMax priceDiscountRate imageUrl productLink offerLink commissionRate sellerCommissionRate';
+const CAMPOS = 'itemId productName priceMin priceMax priceDiscountRate imageUrl productLink offerLink commissionRate sellerCommissionRate sales ratingStar';
 
 // A Shopee informa o preço atual e o percentual de desconto anunciado; o preço "de" é derivado deles.
 function ofertaDe(n) {
@@ -27,6 +27,9 @@ function ofertaDe(n) {
     // Comissão: commissionRate = total; sellerCommissionRate = a extra ("Comissão Xtra") paga pelo vendedor
     comissao_pct: n.commissionRate != null ? Number(n.commissionRate) * 100 : null,
     comissao_extra_pct: n.sellerCommissionRate != null ? Number(n.sellerCommissionRate) * 100 : null,
+    // Prova social: quantos já venderam e a nota (0 a 5)
+    vendidos: n.sales != null ? Number(n.sales) : null,
+    avaliacao: Number(n.ratingStar) || null,
   };
 }
 

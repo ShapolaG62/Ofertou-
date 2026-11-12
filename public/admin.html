@@ -1778,7 +1778,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
       <form class="settings-form">
         <div class="panel">
           <h2>Postagens agendadas</h2>
-          <p class="hint">Nos horários abaixo (horário de Brasília), o site publica algumas ofertas nas redes marcadas: primeiro as da <b>fila</b> (botão "Adicionar à fila agendada" na tela de postagens) e, se faltar, as <b>melhores ofertas do momento</b> (maior desconto, categorias variadas, sem repetir o que foi postado nos últimos 7 dias). Funciona enquanto o site estiver ligado (no seu computador ou na VPS); não roda na Vercel.</p>
+          <p class="hint">Nos horários abaixo (horário de Brasília), o site publica algumas ofertas nas redes marcadas: primeiro as da <b>fila</b> (botão "Adicionar à fila agendada" na tela de postagens) e, se faltar, as <b>melhores ofertas novas</b> (maior desconto, categorias variadas). Só produto novo vai para os grupos: o que já foi postado nos últimos 30 dias não volta, nem com preço novo (a mudança de preço só atualiza a oferta no site). Funciona enquanto o site estiver ligado (no seu computador ou na VPS); não roda na Vercel.</p>
           <div class="grid">
             <label class="field">Agendamento
               <select name="agenda_ativa"><option value="1">Ligado</option><option value="0">Desligado</option></select></label>
@@ -1786,7 +1786,13 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
             <label class="field">Ofertas por horário <input type="number" name="agenda_qtd" min="1" max="20"></label>
             <label class="field">Se a fila não tiver ofertas suficientes
               <select name="agenda_completar"><option value="1">Completar com as melhores ofertas</option><option value="0">Postar só o que estiver na fila</option></select></label>
+            <label class="field">Oferta nova = encontrada nas últimas (horas) <input type="number" name="agenda_novas_horas" min="0" max="720"></label>
+            <label class="field">Tempo máximo na fila (horas) <input type="number" name="agenda_fila_horas" min="1" max="72"></label>
+            <label class="field">Tamanho máximo da fila <input type="number" name="agenda_fila_max" min="1" max="200"></label>
+            <label class="field">Nota mínima de viral (0 a 100) <input type="number" name="agenda_nota_minima" min="0" max="100"></label>
           </div>
+          <p class="hint">A fila anda das ofertas mais novas para as mais antigas. Oferta que espera mais que o tempo máximo sai da fila, e passando do tamanho máximo saem as mais antigas: assim só vão para os grupos ofertas atuais.</p>
+          <p class="hint"><b>Nota de viral:</b> nas ofertas escolhidas pelo site (e nas relâmpago), só vai o que tem cara de vender: preço de impulso (R$ 20 a R$ 80 pesa mais), bom desconto, muitas vendas e nota alta na loja, marca famosa, produto procurado, o que outros grupos estão postando agora e o que mais deu clique nos seus grupos. Imitação, acessório e peça de computador perdem pontos, e foto pequena ou em formato de faixa não vai. 60 deixa passar cerca de 1 em cada 10 ofertas; aumente para ficar mais exigente. O que você coloca na fila à mão não passa pela nota.</p>
           <h3>Ritmo</h3>
           <div class="grid">
             <label class="field">Como postar
@@ -2260,7 +2266,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
 </dialog>
 
 <script src="/js/menu-celular.js?v=20261335"></script>
-<script src="/js/admin.js?v=20261335"></script>
+<script src="/js/admin.js?v=20261336"></script>
 <script src="/js/wa-temas.js?v=20261335"></script>
 <script src="/js/envio-resultados.js?v=20261335"></script>
 <script src="/js/wa-proprio.js?v=20261335"></script>

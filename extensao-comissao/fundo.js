@@ -174,6 +174,41 @@ async function lerFilaDoSite() {
   if (lidos.length) {
     await fetch(`${site}/api/extensao/ml-lidos`, { method: 'POST', headers: { ...cab, 'Content-Type': 'application/json' }, body: JSON.stringify({ itens: lidos }) });
   }
+  await minerarBuscas(site, cab);
+}
+
+// ── Mineração dos anúncios comuns do Mercado Livre ──
+// A API do Mercado Livre só deixa o site ler produtos do catálogo; os anúncios comuns de vendedores ficam de fora.
+// A cada minuto o site manda alguns termos de busca; aqui, no seu Chrome, a busca abre normalmente e a página volta
+// para o site, que lê os produtos com desconto e grava as ofertas. Se o Mercado Livre pedir verificação, para e avisa.
+let minerando = false;
+function soOsProdutos(html) {
+  // Hoje a busca chega com os produtos em blocos de dados (_n.ctx.s["nr"].q("…")): manda só eles
+  const blocos = html.match(/_n\.ctx\.s\["nr"\]\.q\("(?:[^"\\]|\\.)*"\)/g);
+  if (blocos?.length) return blocos.join('\n').slice(0, 3 * 1024 * 1024);
+  const ini = html.indexOf('ui-search-layout');
+  const fim = html.lastIndexOf('poly-card');
+  if (ini < 0 || fim < 0) return html.slice(0, 3 * 1024 * 1024);
+  return html.slice(Math.max(0, html.lastIndexOf('<', ini)), fim + 40000).slice(0, 3 * 1024 * 1024);
+}
+async function minerarBuscas(site, cab) {
+  if (minerando) return;
+  minerando = true;
+  try {
+    const r = await fetch(`${site}/api/extensao/ml-buscas`, { headers: cab, cache: 'no-store' });
+    if (!r.ok) return;
+    const { buscas = [] } = await r.json();
+    for (const b of buscas.slice(0, 10)) {
+      let url;
+      try { url = new URL(b.url); } catch { continue; }
+      if (url.protocol !== 'https:' || url.hostname !== 'lista.mercadolivre.com.br') continue;
+      let corpo;
+      try { corpo = { query: b.query, html: soOsProdutos(await buscar(url.href)) }; } catch (err) { corpo = { query: b.query, erro: String(err?.message || err).slice(0, 200) }; }
+      await fetch(`${site}/api/extensao/ml-busca`, { method: 'POST', headers: { ...cab, 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+      if (corpo.erro) break; // verificação ou erro do Mercado Livre: tenta de novo no próximo minuto
+      await espera(5000);
+    }
+  } finally { minerando = false; }
 }
 
 const ligarLeitor = () => chrome.alarms.create(ALARME_LEITOR, { periodInMinutes: 1 });

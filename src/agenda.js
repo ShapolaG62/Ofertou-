@@ -20,6 +20,16 @@ let pausaEntreOfertas = true; // os testes desligam a pausa
 // Foto recusada pela loja: a oferta dá lugar a outra e só é tentada de novo depois de um tempo (a recusa pode passar)
 const fotosRecusadas = new Map(); // oferta → até quando evitar
 const ESPERA_FOTO_MS = 2 * 3600000;
+// Foto que não vende: pequena demais (fica borrada no celular) ou em formato de faixa/banner (o produto some)
+async function fotoRuim(buffer) {
+  if (!Buffer.isBuffer(buffer)) return null;
+  let m;
+  try { m = await require('sharp')(buffer).metadata(); } catch { return null; }
+  const menor = Math.min(m.width || 0, m.height || 0), proporcao = (m.width || 1) / (m.height || 1);
+  if (menor && menor < 300) return `foto pequena demais (${m.width}x${m.height})`;
+  if (proporcao > 2 || proporcao < 0.45) return `foto em formato de faixa (${m.width}x${m.height})`;
+  return null;
+}
 const fotoRecusada = id => { const ate = fotosRecusadas.get(id); if (ate && ate <= Date.now()) fotosRecusadas.delete(id); return Boolean(ate && ate > Date.now()); };
 const rodando = new Set();          // donos com rodada em andamento ('site' ou id do cliente)
 const ultimaExecucao = new Map();
@@ -71,10 +81,12 @@ function enfileirar(itens, autor, cid = null) {
     const texto = String(it.texto || '').trim().slice(0, 4000) || null;
     const destino = it.destino ? JSON.stringify(it.destino) : null;
     const prioridade = it.prioridade ? 1 : 0;
-    if (ja) db.run('UPDATE post_queue SET texto = ?, autor = ?, destino = ?, prioridade = MAX(prioridade, ?) WHERE id = ?', texto, autor, destino, prioridade, ja.id);
+    // Pedida de novo: volta para a frente (vale como recém-chegada)
+    if (ja) db.run(`UPDATE post_queue SET texto = ?, autor = ?, destino = ?, prioridade = MAX(prioridade, ?), created_at = datetime('now') WHERE id = ?`, texto, autor, destino, prioridade, ja.id);
     else db.run('INSERT INTO post_queue (offer_id, texto, autor, cliente_id, destino, prioridade) VALUES (?, ?, ?, ?, ?, ?)', id, texto, autor, cid, destino, prioridade);
     n++;
   }
+  if (n) arrumarFila(cid);
   return n;
 }
 
@@ -82,7 +94,7 @@ function listarFila(cid = null, limit = 200) {
   return db.all(
     `SELECT q.*, o.produto, o.preco_atual, o.desconto_pct FROM post_queue q LEFT JOIN offers o ON o.id = q.offer_id
      WHERE q.cliente_id IS ?
-     ORDER BY CASE q.status WHEN 'pendente' THEN 0 ELSE 1 END, CASE q.status WHEN 'pendente' THEN -q.prioridade ELSE 0 END, CASE q.status WHEN 'pendente' THEN q.id ELSE -q.id END LIMIT ?`, cid, limit);
+     ORDER BY CASE q.status WHEN 'pendente' THEN 0 ELSE 1 END, CASE q.status WHEN 'pendente' THEN -q.prioridade ELSE 0 END, CASE q.status WHEN 'pendente' THEN q.created_at END DESC, CASE q.status WHEN 'pendente' THEN q.id ELSE -q.id END LIMIT ?`, cid, limit);
 }
 const removerDaFila = (id, cid = null) => db.run(`DELETE FROM post_queue WHERE id = ? AND status = 'pendente' AND cliente_id IS ?`, id, cid);
 const limparFila = (cid = null) => db.run(`DELETE FROM post_queue WHERE status = 'pendente' AND cliente_id IS ?`, cid).changes;
@@ -105,36 +117,38 @@ function filtroDoDono(s) {
   };
 }
 
-// Repetição: o mesmo produto (mesmo por outro vendedor) não volta em 7 dias, a não ser que o preço tenha caído de verdade:
-// pelo menos 10% abaixo do menor preço postado na semana e depois de 24 horas da última postagem.
-const QUEDA_PARA_REPOSTAR = 0.9;
+// Repetição: só produto novo vai para os grupos. O que já foi postado nos últimos 30 dias (mesmo por outro vendedor) não
+// volta, nem com preço novo: a mudança de preço só atualiza a oferta no site.
+const DIAS_SEM_REPETIR = 30;
 const PALAVRAS_VAZIAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'com', 'para', 'por', 'em', 'a', 'o', 'as', 'os', 'kit', 'novo', 'original']);
 // Mesmo produto com outro título ou vendedor: as 6 primeiras palavras que importam, em qualquer ordem
 function impressaoDoProduto(nome) {
   const palavras = semAcento(nome).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(p => p && !PALAVRAS_VAZIAS.has(p)).slice(0, 6);
   return [...new Set(palavras)].sort().join(' ');
 }
-// relampago: a oferta relâmpago não espera as 24 horas, mas precisa estar pelo menos 10% abaixo do menor preço postado
-function regraDeRepeticao(cid, { relampago = false } = {}) {
-  const porId = new Map(), porNome = new Map();
-  const juntar = (mapa, chave, p) => {
-    const atual = mapa.get(chave) || { menor: null, semPreco: false, ultima: 0 };
-    const preco = Number(p.preco);
-    if (preco > 0) atual.menor = atual.menor === null ? preco : Math.min(atual.menor, preco);
-    else atual.semPreco = true; // postagem antiga, de antes de guardar o preço
-    atual.ultima = Math.max(atual.ultima, Date.parse(`${String(p.created_at).replace(' ', 'T')}Z`) || 0);
-    mapa.set(chave, atual);
-  };
-  for (const p of db.all(`SELECT offer_id, produto, preco, created_at FROM social_posts WHERE ok = 1 AND cliente_id IS ? AND created_at > datetime('now', '-7 days')`, cid)) {
-    juntar(porId, p.offer_id, p);
-    juntar(porNome, impressaoDoProduto(p.produto), p);
+function regraDeRepeticao(cid) {
+  const porId = new Set(), porNome = new Set();
+  for (const p of db.all(`SELECT offer_id, produto FROM social_posts WHERE ok = 1 AND cliente_id IS ? AND created_at > datetime('now', ?)`, cid, `-${DIAS_SEM_REPETIR} days`)) {
+    porId.add(p.offer_id);
+    porNome.add(impressaoDoProduto(p.produto));
   }
-  const bloqueia = (reg, o) => {
-    if (!reg) return false;
-    if (reg.semPreco || reg.menor === null || (!relampago && Date.now() - reg.ultima < 24 * 3600000)) return true;
-    return !(Number(o.preco_atual) <= reg.menor * QUEDA_PARA_REPOSTAR);
-  };
-  return { porOferta: o => bloqueia(porId.get(o.id), o), porProduto: o => bloqueia(porNome.get(impressaoDoProduto(o.produto)), o) };
+  return { porOferta: o => porId.has(o.id), porProduto: o => porNome.has(impressaoDoProduto(o.produto)) };
+}
+
+// ── Fila sempre curta e atual ────────────────────────────────────────────────
+// Oferta que espera demais pode ter mudado ou acabado, e uma fila enorme atrasa as novas. Então: sai da fila o que
+// esperou mais que agenda_fila_horas e, passando de agenda_fila_max, saem as mais antigas. A fila anda das mais novas
+// para as mais antigas (relâmpago sempre na frente).
+const numeroEntre = (v, pad, min, max) => { const n = parseInt(v, 10); return Math.min(Math.max(Number.isFinite(n) ? n : pad, min), max); };
+function arrumarFila(cid = null, s = configDe(cid)) {
+  const horas = numeroEntre(s.agenda_fila_horas, 6, 1, 72);
+  const max = numeroEntre(s.agenda_fila_max, 20, 1, 200);
+  let saiu = db.run(`UPDATE post_queue SET status = 'expirado', resultado = ? WHERE status = 'pendente' AND cliente_id IS ? AND created_at < datetime('now', ?)`,
+    `Esperou mais de ${horas} h na fila: saiu para dar lugar a ofertas mais novas.`, cid, `-${horas} hours`).changes;
+  const sobra = db.all(`SELECT id FROM post_queue WHERE status = 'pendente' AND cliente_id IS ? ORDER BY prioridade DESC, created_at DESC, id LIMIT -1 OFFSET ?`, cid, max);
+  for (const q of sobra) db.run(`UPDATE post_queue SET status = 'expirado', resultado = ? WHERE id = ?`, `A fila passou de ${max} ofertas: saíram as mais antigas.`, q.id);
+  saiu += sobra.length;
+  return saiu;
 }
 
 // Melhores ofertas do momento: as de maior nota (chance de venda + comissão extra, sem descontos suspeitos), categorias
@@ -151,15 +165,27 @@ function melhoresOfertas(qtd, excluir, cid = null, s = configDe(cid), { soTemas 
   const soDosGrupos = soTemas && grupos.length && comTema.length === grupos.length;
   const pagas = cid ? new Set(clientes.lojasComAfiliado(s)) : null;
   const limite = Date.now() - 12 * 3600000;
+  // Só produto novo: encontrado pela primeira vez nas últimas agenda_novas_horas (0 = qualquer um ainda não postado)
+  const horasNovas = numeroEntre(s.agenda_novas_horas, 24, 0, 720);
+  const desde = horasNovas ? Date.now() - horasNovas * 3600000 : 0;
+  const quando = v => Date.parse(`${String(v).replace(' ', 'T')}Z`) || 0;
   let rows = require('./busca-ofertas').paraPostar(o => !repeticao.porOferta(o) && !excluir.has(o.id) && passa(o)
-    && (!soDosGrupos || grupos.some(g => whatsapp.grupoRecebe(g, o.categoria, o.store_id))) && Date.parse(`${String(o.last_seen_at).replace(' ', 'T')}Z`) > limite && (!pagas?.size || pagas.has(o.store_id))).slice(0, 1500);
-  // Só com foto pública (a postagem sai com a imagem)
-  const comFoto = new Set();
+    && (!soDosGrupos || grupos.some(g => whatsapp.grupoRecebe(g, o.categoria, o.store_id))) && quando(o.last_seen_at) > limite
+    && quando(o.created_at) >= desde && (!pagas?.size || pagas.has(o.store_id)));
+  // Só produto com cara de viral (src/nota-grupos.js): nota mínima do painel; as de nota maior vão primeiro
+  const notas = require('./nota-grupos');
+  const ctx = notas.contexto(cid);
+  const minima = numeroEntre(s.agenda_nota_minima, 60, 0, 100);
+  rows = rows.map(o => ({ o, nota: notas.notaGrupo(o, ctx).nota })).filter(x => x.nota >= minima - 4) // foto ainda não conta
+    .sort((a, b) => b.nota - a.nota).slice(0, 1500).map(x => x.o);
+  // Só com foto pública (a postagem sai com a imagem); a loja da foto entra na nota
+  const fotos = new Map();
   for (let i = 0; i < rows.length; i += 500) {
     const ids = rows.slice(i, i + 500).map(r => r.id);
-    for (const r of db.all(`SELECT id FROM offers WHERE id IN (${ids.map(() => '?').join(',')}) AND imagem LIKE 'https://%'`, ...ids)) comFoto.add(r.id);
+    for (const r of db.all(`SELECT id, imagem FROM offers WHERE id IN (${ids.map(() => '?').join(',')}) AND imagem LIKE 'https://%'`, ...ids)) fotos.set(r.id, r.imagem);
   }
-  rows = rows.filter(r => comFoto.has(r.id));
+  rows = rows.filter(r => fotos.has(r.id)).map(o => ({ o, nota: notas.notaGrupo({ ...o, imagem: fotos.get(o.id) }, ctx).nota }))
+    .filter(x => x.nota >= minima).sort((a, b) => b.nota - a.nota).map(x => x.o);
   const vistos = new Set(); // o mesmo produto de vendedores diferentes entra uma vez só
   rows = rows.filter(r => {
     const k = impressaoDoProduto(r.produto);
@@ -209,8 +235,9 @@ async function executar(motivo = 'agendado', cid = null, qtdForcada = null, { so
   const quem = cid ? `cliente ${cid}` : 'site';
   const soWhatsapp = prontas.length === 1 && prontas[0] === 'whatsapp';
   try {
-    // 1) fila (pula ofertas que saíram do ar); 2) completa com as melhores ofertas do momento
-    const fila = db.all(`SELECT * FROM post_queue WHERE status = 'pendente' AND cliente_id IS ? ${soRelampago ? 'AND prioridade = 1' : ''} ORDER BY prioridade DESC, id`, cid);
+    // 1) fila, das mais novas para as mais antigas (pula ofertas que saíram do ar); 2) completa com as melhores ofertas novas
+    arrumarFila(cid, s);
+    const fila = db.all(`SELECT * FROM post_queue WHERE status = 'pendente' AND cliente_id IS ? ${soRelampago ? 'AND prioridade = 1' : ''} ORDER BY prioridade DESC, created_at DESC, id`, cid);
     const usadas = new Set(fila.map(q => q.offer_id));
     for (const id of [...fotosRecusadas.keys()]) if (fotoRecusada(id)) usadas.add(id);
     let posFila = 0;
@@ -267,10 +294,20 @@ async function executar(motivo = 'agendado', cid = null, qtdForcada = null, { so
         const endereco = social.postImage(db.get('SELECT imagem FROM offers WHERE id = ?', it.offer_id) || {}, s);
         if (endereco && fotoRecusada(it.offer_id)) { descartar(it, motivoFoto); fotosNestaLeva++; pulados[pulados.length - 1].foto = true; continue; }
         if (endereco) {
-          try { foto = await whatsapp.fotoParaEnvio(endereco); } catch (err) {
+          try {
+            foto = await whatsapp.fotoParaEnvio(endereco);
+          } catch (err) {
             log(`${quem}: foto da oferta ${it.offer_id} recusada (${err.message})`);
             fotosRecusadas.set(it.offer_id, Date.now() + ESPERA_FOTO_MS);
             descartar(it, motivoFoto); fotosNestaLeva++; pulados[pulados.length - 1].foto = true;
+            continue;
+          }
+          // Foto que não vende (pequena ou em faixa): a oferta não vai, e não volta a ser escolhida por uma semana
+          const ruim = await fotoRuim(foto);
+          if (ruim) {
+            fotosRecusadas.set(it.offer_id, Date.now() + 7 * 86400000);
+            descartar(it, `Foto ruim para o grupo (${ruim}): entrou outra oferta no lugar.`); fotosNestaLeva++;
+            foto = null;
             continue;
           }
         }
@@ -358,6 +395,7 @@ function verificarCupons(cid, s) {
 
 function verificarDono(cid) {
   const s = configDe(cid);
+  arrumarFila(cid, s);
   verificarCupons(cid, s);
   if (s.agenda_ativa !== '1' || rodando.has(dono(cid))) return;
   if (s.agenda_modo === 'continuo') return verificarContinuo(cid, s);
@@ -407,4 +445,4 @@ function estado(cid = null) {
 // Só para os testes
 const _paraTestes = ({ pausa, limparFotos } = {}) => { if (pausa !== undefined) pausaEntreOfertas = pausa; if (limparFotos) fotosRecusadas.clear(); };
 
-module.exports = { regraDeRepeticao, redesAgenda, _paraTestes, impressaoDoProduto, enfileirar, listarFila, removerDaFila, limparFila, pendentes, executar, iniciar, estado, horarios, melhoresOfertas, filtroDoDono };
+module.exports = { regraDeRepeticao, arrumarFila, redesAgenda, _paraTestes, impressaoDoProduto, enfileirar, listarFila, removerDaFila, limparFila, pendentes, executar, iniciar, estado, horarios, melhoresOfertas, filtroDoDono };

@@ -139,3 +139,26 @@ test('API própria de WhatsApp: sem login ou sem a chave, nada abre', async () =
   assert.equal((await json('/api/wa/conectar', {})).status, 401, 'a chave não conecta o número');
   assert.equal((await json('/api/whatsapp/webhook/qualquer', {})).status, 404, 'o endereço de aviso da Z-API e da Evolution saiu');
 });
+
+test('extensão do Chrome: busca do Mercado Livre pela chave, com página grande', async () => {
+  const c = cookieDe(await json('/api/admin/login', { password: SENHA }));
+  const { chave } = await (await pede('/api/admin/extensao/leitor', { headers: { Cookie: c } })).json();
+  assert.ok(chave);
+  assert.equal((await pede('/api/extensao/ml-buscas', { headers: { 'X-Ofertou-Chave': 'errada' } })).status, 401);
+  const r = await pede('/api/extensao/ml-buscas', { headers: { 'X-Ofertou-Chave': chave } });
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray((await r.json()).buscas));
+  // Página no formato do Mercado Livre, com ~1 MB de enchimento (a página real tem perto disso)
+  const texto = '0:{"optimizedResponse":{"results":[{"id":"POLYCARD","polycard":{"metadata":{"id":"MLB3505290114"},'
+    + '"pictures":{"pictures":[{"id":"624087-MLB69000247214_042023"}]},"components":[{"type":"title","title":{"text":"Chinelo Babuche Nellie Boaonda"}},'
+    + '{"type":"price","price":{"price_labels":[{"values":[{"key":"previous_price","price":{"value":99.99,"previous":true}}]}],"current_price":{"value":68.99}}}]}}],'
+    + `"enchimento":"${'x'.repeat(1024 * 1024)}"}}\n`;
+  const html = `_n.ctx.s["nr"].q(${JSON.stringify(texto)})`;
+  const sem = await pede('/api/extensao/ml-busca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'chinelo', html }) });
+  assert.equal(sem.status, 401, 'sem chave não grava');
+  const ok = await pede('/api/extensao/ml-busca', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Ofertou-Chave': chave }, body: JSON.stringify({ query: 'chinelo', html }) });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { encontradas: 1, gravadas: 1 });
+  const lojas = await (await pede('/api/admin/stores', { headers: { Cookie: c } })).json();
+  assert.equal(lojas.ml_chrome.gravadas, 1);
+});

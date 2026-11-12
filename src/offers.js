@@ -53,6 +53,9 @@ function saveDeal(store, deal, opts = {}) {
   // Comissão (%) só quando a API da loja informa; sem ela, fica a última conhecida
   const pct = v => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
   const comissao = pct(deal.comissao_pct), comissaoExtra = pct(deal.comissao_extra_pct);
+  // Prova social (quando a loja informa; sem ela, fica a última conhecida)
+  const vendidos = deal.vendidos != null && deal.vendidos !== '' && Number(deal.vendidos) >= 0 ? Math.round(Number(deal.vendidos)) : null;
+  const avaliacao = Number(deal.avaliacao) > 0 && Number(deal.avaliacao) <= 5 ? Math.round(Number(deal.avaliacao) * 10) / 10 : null;
   // Cupom: vale o que veio nesta leitura (sem cupom agora, ele sai: o preço novo não é mais o preço com cupom)
   const cupom = deal.cupom_codigo ? [String(deal.cupom_codigo), deal.cupom_texto || null, round2(Number(deal.preco_sem_cupom)) || null] : [null, null, null];
 
@@ -66,10 +69,11 @@ function saveDeal(store, deal, opts = {}) {
         `UPDATE offers SET produto = ?, preco_atual = ?, preco_anterior = ?, desconto_pct = ?, imagem = COALESCE(?, imagem),
            original_url = ?, affiliate_url = ?, aff_fixed = ?, fonte = ?, expires_at = ?, subcategoria = ?,
            comissao_pct = COALESCE(?, comissao_pct), comissao_extra_pct = COALESCE(?, comissao_extra_pct),
+           vendidos = COALESCE(?, vendidos), avaliacao = COALESCE(?, avaliacao),
            updated_at = datetime('now'), last_seen_at = datetime('now')
          WHERE id = ?`,
         produto, atual, anterior, desconto, deal.imagem || null, deal.original_url, affiliate, affFixed,
-        fonte, expiresAt, classifySubcategory(produto, existing.categoria), comissao, comissaoExtra, existing.id
+        fonte, expiresAt, classifySubcategory(produto, existing.categoria), comissao, comissaoExtra, vendidos, avaliacao, existing.id
       );
       // manterCupom: leitura que não vê cupom (ofertas do Mercado Livre) não apaga o cupom de um produto com o mesmo preço
       if (!(opts.manterCupom && !deal.cupom_codigo && existing.cupom_codigo && atual <= Number(existing.preco_atual) * 1.01)) {
@@ -84,11 +88,11 @@ function saveDeal(store, deal, opts = {}) {
     const res = db.run(
       `INSERT INTO offers (store_id, store_product_id, plataforma, produto, preco_atual, preco_anterior, desconto_pct,
          categoria, subcategoria, imagem, original_url, affiliate_url, aff_fixed, fonte, expires_at, loja_id, comissao_pct, comissao_extra_pct,
-         cupom_codigo, cupom_texto, preco_sem_cupom)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         cupom_codigo, cupom_texto, preco_sem_cupom, vendidos, avaliacao)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       store.id, String(deal.store_product_id), store.name, produto, atual, anterior, desconto,
       categoria, classifySubcategory(produto, categoria), deal.imagem || null, deal.original_url, affiliate, affFixed, fonte,
-      expiresAt, lojaId, comissao, comissaoExtra, ...cupom
+      expiresAt, lojaId, comissao, comissaoExtra, ...cupom, vendidos, avaliacao
     );
     const id = Number(res.lastInsertRowid);
     require('./relampago').aoGravar({ id, deal, atual, desconto, fonte });

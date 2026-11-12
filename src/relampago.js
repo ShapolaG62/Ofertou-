@@ -128,20 +128,24 @@ async function despacharDono(cid, suspeitas) {
   const dono = cid ? `c:${cid}` : 'site';
   const ativa = require('./offers').activeClause();
   const limite = sql(Date.now() + MINUTOS_MINIMOS * 60000);
-  const lista = db.all(`SELECT o.id, o.produto, o.store_id, o.categoria, o.desconto_pct, o.preco_atual, o.relampago_tipo, o.relampago_fim, o.relampago_desde
-      FROM offers o WHERE o.relampago_fim > ? AND o.fonte = 'auto' AND ${ativa.sql}
+  const lista = db.all(`SELECT o.id, o.produto, o.store_id, o.categoria, o.desconto_pct, o.preco_atual, o.preco_anterior, o.imagem, o.vendidos, o.avaliacao, o.comissao_extra_pct, o.cupom_codigo, o.relampago_tipo, o.relampago_fim, o.relampago_desde
+      FROM offers o WHERE o.relampago_fim > ? AND o.fonte = 'auto' AND o.relampago_tipo = 'loja' AND ${ativa.sql}
         AND NOT EXISTS (SELECT 1 FROM relampago_postados p WHERE p.dono = ? AND p.offer_id = o.id AND p.desde = o.relampago_desde)
       ORDER BY CASE o.relampago_tipo WHEN 'loja' THEN 0 ELSE 1 END, o.desconto_pct DESC LIMIT 200`, limite, ...ativa.params, dono);
   const passa = agenda.filtroDoDono(s);
-  const repeticao = agenda.regraDeRepeticao(cid, { relampago: true });
+  const repeticao = agenda.regraDeRepeticao(cid);
   const pagas = cid ? new Set(clientes.lojasComAfiliado(s)) : null;
   const soWhatsapp = redes.length === 1 && redes[0] === 'whatsapp';
+  // Só o que tem cara de viral (mesma nota mínima das postagens automáticas)
+  const notas = require('./nota-grupos'), ctx = notas.contexto(cid);
+  const minima = Math.min(Math.max(parseInt(s.agenda_nota_minima ?? '60', 10) || 0, 0), 100);
   let espaco = FILA_MAXIMA - db.get(`SELECT COUNT(*) n FROM post_queue WHERE status = 'pendente' AND prioridade = 1 AND cliente_id IS ?`, cid).n;
   for (const o of lista) {
     if (espaco <= 0) break;
     if (suspeitas.has(o.id) || o.desconto_pct < 15 || o.desconto_pct > 80 || !passa(o)) continue;
     if (pagas?.size && !pagas.has(o.store_id)) continue;
     if (repeticao.porOferta(o) || repeticao.porProduto(o)) continue;
+    if (notas.notaGrupo(o, ctx).nota < minima) continue;
     if (soWhatsapp && !whatsapp.gruposDaOferta(s, o.categoria, o.store_id).length) continue;
     agenda.enfileirar([{ offer_id: o.id, prioridade: 1 }], 'radar relâmpago', cid);
     db.run('INSERT OR IGNORE INTO relampago_postados (dono, offer_id, desde) VALUES (?, ?, ?)', dono, o.id, o.relampago_desde);

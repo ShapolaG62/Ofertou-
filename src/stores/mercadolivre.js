@@ -196,7 +196,114 @@ function idFromUrl(url) {
   return m ? `MLB${m[2]}` : null;
 }
 
+// Código do anúncio no link do card da busca. Os links podem ser:
+//  • produto.mercadolivre.com.br/MLB-3505290114-nome-_JM (anúncio comum);
+//  • www.mercadolivre.com.br/nome/up/MLBU…?pdp_filters=item_id:MLB… (o anúncio está no pdp_filters; MLBU não é anúncio);
+//  • www.mercadolivre.com.br/nome/p/MLB…?…wid=MLB… (catálogo: o anúncio está no wid);
+//  • click1.mercadolivre.com.br/… (patrocinado: o destino vai dentro do link, com o pdp_filters).
+function idDoCard(link) {
+  let texto = String(link);
+  try { texto = decodeURIComponent(texto); } catch { /* link com % solto: usa como veio */ }
+  const doFiltro = texto.match(/item_id:(MLB)(\d{6,})/i) || texto.match(/[?&]wid=(MLB)(\d{6,})/i);
+  if (doFiltro) return `MLB${doFiltro[2]}`;
+  if (/\/p\/MLB\d/i.test(texto)) return null; // catálogo sem o anúncio no link: o código é do produto, não do anúncio
+  const m = texto.match(/(?:^|[/=])MLB-?(\d{6,})/i);
+  return m ? `MLB${m[1]}` : null;
+}
+
+// ── Dados da busca embutidos na página ──
+// A busca do Mercado Livre chega sem os cards no HTML: o navegador monta os produtos a partir de blocos
+// _n.ctx.s["nr"].q("0:{…}") com um JSON quase comum: "@65" aponta para a linha "65:{…}", "u" é vazio (undefined),
+// e aparecem "$0", "NaN"... Aqui cada linha vira JSON (fora dos textos: @N → referência, outras palavras → null).
+const RE_BLOCO_NORDIC = /_n\.ctx\.s\["nr"\]\.q\(("(?:[^"\\]|\\.)*")\)/g;
+function linhaNordic(v) {
+  let o = '', str = false, esc = false;
+  for (let i = 0; i < v.length; i++) {
+    const c = v[i];
+    if (str) { o += c; if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') str = false; continue; }
+    if (c === '"') { str = true; o += c; continue; }
+    if (/[A-Za-z$@]/.test(c)) {
+      let t = c;
+      while (/[A-Za-z0-9$@_.]/.test(v[i + 1] || '')) t += v[++i];
+      o += /^@\d+$/.test(t) ? `{"$ref":${t.slice(1)}}` : t === 'true' || t === 'false' || t === 'null' ? t : 'null';
+      continue;
+    }
+    o += c;
+  }
+  return JSON.parse(o);
+}
+function dadosNordic(html) {
+  let texto = '';
+  for (const m of String(html).matchAll(RE_BLOCO_NORDIC)) { try { texto += `${JSON.parse(m[1])}\n`; } catch { /* bloco cortado */ } }
+  if (!texto) return null;
+  const tab = {};
+  let n = 0;
+  for (const l of texto.split('\n')) {
+    if (!l.trim()) continue;
+    const m = /^(\d+):/.exec(l);
+    try { tab[m ? m[1] : `x${n++}`] = linhaNordic(m ? l.slice(m[0].length) : l); } catch { /* linha que não deu para ler */ }
+  }
+  // Segue as referências só quando precisa (a página repete muitos pedaços por referência)
+  const r = (x, d = 0) => (x && typeof x === 'object' && x.$ref !== undefined && d < 50 ? r(tab[x.$ref], d + 1) : x);
+  return { raiz: r(tab['0']), r };
+}
+function dealsNordic(html) {
+  const d = dadosNordic(html);
+  if (!d) return [];
+  const { r } = d;
+  const lista = r(r(r(d.raiz)?.optimizedResponse)?.results);
+  if (!Array.isArray(lista)) return [];
+  const valor = p => Number(r(p)?.value) || 0;
+  const deals = [];
+  const vistos = new Set();
+  for (const item of lista) {
+    const pc = r(r(item)?.polycard);
+    const md = r(pc?.metadata);
+    const id = String(md?.id || '');
+    if (!/^MLB\d{6,}$/.test(id) || vistos.has(id)) continue;
+    const comps = (r(pc.components) || []).map(c => r(c));
+    const comp = tipo => r(comps.find(c => c?.type === tipo)?.[tipo]);
+    const produto = String(comp('title')?.text || '').trim();
+    const preco = comp('price');
+    const atual = valor(preco?.current_price);
+    let anterior = valor(preco?.previous_price);
+    if (!anterior) {
+      for (const rotulo of r(preco?.price_labels) || []) {
+        for (const v of r(r(rotulo)?.values) || []) {
+          const p = r(r(v)?.price);
+          if (r(v)?.key === 'previous_price' || p?.previous === true) anterior = Number(p?.value) || anterior;
+        }
+      }
+    }
+    if (!produto || !(atual > 0) || !(anterior > atual)) continue;
+    const foto = r(r(r(pc.pictures)?.pictures)?.[0])?.id;
+    const sinal = r(md.signal) || {};
+    const vendidos = Number(sinal.sales ?? r(md.tracks)?.sold_quantity);
+    vistos.add(id);
+    deals.push({
+      store_product_id: id,
+      produto,
+      preco_atual: atual,
+      preco_anterior: anterior,
+      imagem: /^[\w-]+$/.test(String(foto || '')) ? `https://http2.mlstatic.com/D_Q_NP_2X_${foto}-E.webp` : null,
+      original_url: `https://produto.mercadolivre.com.br/MLB-${id.slice(3)}`,
+      // Prova social da busca: "+10mil vendidos" e a nota das avaliações
+      ...(vendidos >= 0 ? { vendidos } : {}),
+      ...(Number(sinal.reviews_rating) > 0 ? { avaliacao: Number(sinal.reviews_rating) } : {}),
+    });
+  }
+  return deals;
+}
+
+// Página de busca do Mercado Livre → ofertas (só as que têm preço riscado). Primeiro os dados embutidos na página
+// (é assim que ela chega hoje); se não houver, os cards já montados no HTML.
 function parseHtml(html) {
+  const embutidos = dealsNordic(html);
+  if (embutidos.length) return embutidos;
+  return parseCards(html);
+}
+
+function parseCards(html) {
   const $ = cheerio.load(html);
   const deals = [];
   $('.poly-card, .ui-search-layout__item').each((_, el) => {
@@ -215,7 +322,7 @@ function parseHtml(html) {
     const current = toNumber(curr);
     const previous = toNumber(prev);
     const img = card.find('img').attr('data-src') || card.find('img').attr('src');
-    const id = link && idFromUrl(link);
+    const id = link && idDoCard(link);
 
     if (!title || !link || !id || !current || !previous) return;
     deals.push({
@@ -223,8 +330,9 @@ function parseHtml(html) {
       produto: title,
       preco_atual: current,
       preco_anterior: previous,
-      imagem: img && !img.startsWith('data:') ? img : null,
-      original_url: link.split('#')[0].split('?')[0],
+      imagem: img && /^https:\/\//.test(img) ? img : null,
+      // Link direto do anúncio: abre a página certa até para anúncio patrocinado (click1…) e produto com vários vendedores (/up/)
+      original_url: `https://produto.mercadolivre.com.br/MLB-${id.slice(3)}`,
     });
   });
   return deals;
@@ -293,6 +401,9 @@ async function dadosDoAnuncio(itemId, s) {
 }
 
 module.exports = {
+  parseHtml,
+  dealsNordic,
+  idDoCard,
   ofertaDoProduto,
   dadosDoAnuncio,
   anuncioAgora,

@@ -43,6 +43,7 @@ function limpar() {
   settings.set('agenda_ativa', '1');
   settings.set('agenda_completar', '1');
   settings.set('agenda_qtd', '1');
+  settings.set('agenda_nota_minima', '0'); // a nota de viral tem testes próprios (test/nota-grupos.test.js)
   settings.set('smtp_host', '');
 }
 let seq = 0;
@@ -349,22 +350,50 @@ test('temas e repetição na escolha automática', async () => {
   ids = agenda.melhoresOfertas(10, new Set(), null, s);
   assert.ok(!ids.includes(pc) && !ids.includes(mesmoOutroVendedor), 'preço igual não repete');
 
-  // Caiu 10% ou mais: pode voltar
-  db.run("UPDATE offers SET preco_atual = 85, desconto_pct = 57, updated_at = datetime('now', '+1 minutes') WHERE id = ?", pc);
+  // Só produto novo vai para os grupos: o preço caiu muito, mas o produto já foi postado. Só o site é atualizado.
+  db.run("UPDATE offers SET preco_atual = 60, desconto_pct = 70, updated_at = datetime('now', '+1 minutes') WHERE id = ?", pc);
   await atualizarBusca();
-  assert.ok(agenda.melhoresOfertas(10, new Set(), null, s).includes(pc), 'caiu de verdade: volta');
+  assert.ok(!agenda.melhoresOfertas(10, new Set(), null, s).includes(pc), 'preço novo não faz o produto voltar aos grupos');
+  db.run(`UPDATE social_posts SET created_at = datetime('now', '-20 days') WHERE offer_id = ?`, pc);
+  assert.ok(!agenda.melhoresOfertas(10, new Set(), null, s).includes(pc), 'nem 20 dias depois');
 
-  // Caiu, mas postou há menos de 24 h: espera
-  db.run(`UPDATE social_posts SET created_at = datetime('now', '-3 hours') WHERE offer_id = ?`, pc);
-  assert.ok(!agenda.melhoresOfertas(10, new Set(), null, s).includes(pc));
-
-  // Postagem antiga, sem preço guardado: continua a regra de 7 dias
-  db.run(`UPDATE social_posts SET created_at = datetime('now', '-48 hours'), preco = NULL WHERE offer_id = ?`, pc);
-  assert.ok(!agenda.melhoresOfertas(10, new Set(), null, s).includes(pc));
-
-  // Passaram 7 dias: livre
-  db.run(`UPDATE social_posts SET created_at = datetime('now', '-8 days') WHERE offer_id = ?`, pc);
+  // Passaram 30 dias: livre (se ainda for oferta nova)
+  db.run(`UPDATE social_posts SET created_at = datetime('now', '-31 days') WHERE offer_id = ?`, pc);
   assert.ok(agenda.melhoresOfertas(10, new Set(), null, s).includes(pc));
+});
+
+test('só ofertas novas completam a rodada', async () => {
+  limpar();
+  settings.set('whatsapp_groups', JSON.stringify([GRUPOS[0]]));
+  const nova = oferta({ produto: 'Air fryer nova encontrada agora', desconto_pct: 50 });
+  const antiga = oferta({ produto: 'Liquidificador encontrado faz dias', desconto_pct: 50 });
+  db.run(`UPDATE offers SET created_at = datetime('now', '-3 days') WHERE id = ?`, antiga);
+  await atualizarBusca();
+  const s = settings.getAll();
+  let ids = agenda.melhoresOfertas(10, new Set(), null, s);
+  assert.ok(ids.includes(nova));
+  assert.ok(!ids.includes(antiga), 'encontrada há 3 dias não é mais oferta nova (padrão: 24 h)');
+  ids = agenda.melhoresOfertas(10, new Set(), null, { ...s, agenda_novas_horas: '0' });
+  assert.ok(ids.includes(antiga), '0 = qualquer oferta ainda não postada');
+});
+
+test('fila curta e atual: sai o que esperou demais e, passando do limite, as mais antigas', () => {
+  limpar();
+  settings.set('agenda_fila_horas', '6');
+  settings.set('agenda_fila_max', '3');
+  const ids = Array.from({ length: 6 }, (_, i) => oferta({ produto: `Produto da fila ${i}` }));
+  agenda.enfileirar([{ offer_id: ids[0] }], 'teste');
+  db.run(`UPDATE post_queue SET created_at = datetime('now', '-7 hours') WHERE offer_id = ?`, ids[0]);
+  for (const [i, id] of ids.slice(1).entries()) {
+    agenda.enfileirar([{ offer_id: id }], 'teste');
+    db.run(`UPDATE post_queue SET created_at = datetime('now', ?) WHERE offer_id = ?`, `-${50 - i} minutes`, id);
+  }
+  agenda.arrumarFila();
+  const fila = agenda.listarFila().filter(q => q.status === 'pendente').map(q => q.offer_id);
+  assert.deepEqual(fila, [ids[5], ids[4], ids[3]], 'ficam as 3 mais novas, a mais nova primeiro');
+  assert.match(db.get('SELECT resultado FROM post_queue WHERE offer_id = ?', ids[0]).resultado, /mais de 6 h/);
+  assert.match(db.get('SELECT resultado FROM post_queue WHERE offer_id = ?', ids[1]).resultado, /passou de 3/);
+  settings.set('agenda_fila_max', '20');
 });
 
 test('impressão do produto ignora ordem, acento e palavras vazias', () => {
@@ -556,4 +585,40 @@ test('outro erro no envio continua como antes, e foto baixada não atrapalha as 
   const r = await agenda.executar('horário 13:00');
   assert.equal(r.feitos[0].ok, false);
   assert.match(avisosDoSite()[0].titulo, /falharam/);
+});
+
+test('nota de viral: só o que tem cara de vender completa a rodada', async () => {
+  limpar();
+  settings.set('agenda_nota_minima', '60');
+  settings.set('whatsapp_groups', JSON.stringify([GRUPOS[0]]));
+  const viral = oferta({ produto: 'Fone de Ouvido JBL Tune 520BT Bluetooth', preco_atual: 69.9, preco_anterior: 149.9, desconto_pct: 53, categoria: 'audio_tv' });
+  db.run('UPDATE offers SET vendidos = 12000, avaliacao = 4.8 WHERE id = ?', viral);
+  const comum = oferta({ produto: 'Camisa Social Masculina Slim Manga Longa', preco_atual: 66, preco_anterior: 80, desconto_pct: 18, categoria: 'moda' });
+  const nicho = oferta({ produto: 'Processador AMD Ryzen 5 5500 3.6GHz', preco_atual: 589, preco_anterior: 800, desconto_pct: 26 });
+  await atualizarBusca();
+  const ids = agenda.melhoresOfertas(10, new Set(), null, settings.getAll());
+  assert.deepEqual(ids, [viral], 'a comum e a peça de computador ficam de fora');
+  settings.set('agenda_nota_minima', '0');
+  assert.ok(agenda.melhoresOfertas(10, new Set(), null, settings.getAll()).includes(comum), 'nota mínima 0: todas continuam disponíveis');
+  assert.ok(nicho);
+});
+
+test('foto pequena ou em formato de faixa não vai ao grupo: entra a oferta seguinte', async () => {
+  limpar();
+  const sharp = require('sharp');
+  const imagem = (w, h) => sharp({ create: { width: w, height: h, channels: 3, background: '#ffffff' } }).jpeg().toBuffer();
+  const pequena = oferta({ imagem: 'https://img.test/pequena.jpg' });
+  const faixa = oferta({ imagem: 'https://img.test/faixa.jpg' });
+  const boa = oferta({ imagem: 'https://img.test/boa.jpg' });
+  const fotos = { pequena: await imagem(200, 200), faixa: await imagem(1000, 300), boa: await imagem(800, 800) };
+  const antes = whatsapp.fotoParaEnvio;
+  whatsapp.fotoParaEnvio = async url => fotos[url.match(/(pequena|faixa|boa)/)[1]];
+  try {
+    agenda.enfileirar([{ offer_id: pequena, texto: 'pequena' }, { offer_id: faixa, texto: 'faixa' }, { offer_id: boa, texto: 'boa' }], 'teste');
+    const r = await agenda.executar('horário 09:00');
+    assert.deepEqual(r.feitos.map(f => f.offer_id), [boa]);
+    assert.match(db.get('SELECT resultado FROM post_queue WHERE offer_id = ?', pequena).resultado, /pequena demais/);
+    assert.match(db.get('SELECT resultado FROM post_queue WHERE offer_id = ?', faixa).resultado, /formato de faixa/);
+    assert.equal(avisosDoSite().length, 0, 'não vira aviso de loja recusando foto');
+  } finally { whatsapp.fotoParaEnvio = antes; }
 });
