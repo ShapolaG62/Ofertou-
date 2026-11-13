@@ -295,6 +295,17 @@ function dealsNordic(html) {
   return deals;
 }
 
+// "Outras pessoas pesquisaram" da página de busca: [{ q, categoria }] (categoria = código do ML ou null)
+function buscasRelacionadas(html) {
+  const d = dadosNordic(html);
+  if (!d) return [];
+  const { r } = d;
+  const lista = r(r(r(r(d.raiz)?.optimizedResponse)?.related_searches)?.related_searches);
+  if (!Array.isArray(lista)) return [];
+  return lista.map(x => r(x)).filter(x => x && typeof x.q === 'string')
+    .map(x => ({ q: x.q.trim(), categoria: /^MLB\d+$/.test(String(x.category_id)) ? x.category_id : null }));
+}
+
 // Página de busca do Mercado Livre → ofertas (só as que têm preço riscado). Primeiro os dados embutidos na página
 // (é assim que ela chega hoje); se não houver, os cards já montados no HTML.
 function parseHtml(html) {
@@ -403,6 +414,7 @@ async function dadosDoAnuncio(itemId, s) {
 module.exports = {
   parseHtml,
   dealsNordic,
+  buscasRelacionadas,
   idDoCard,
   ofertaDoProduto,
   dadosDoAnuncio,

@@ -130,3 +130,45 @@ test('termo entregue que não volta em 3 minutos é entregue de novo (até 3 vez
   for (let i = 0; i < 3; i++) { voltar(4); mlChrome.proximos(); }
   assert.ok(!JSON.parse(settings.get('ml_chrome_entregues')).some(e => e.q === 'mouse gamer' && e.vezes > 3), 'desiste depois de 3 vezes');
 });
+
+test('aprende termos novos em "Outras pessoas pesquisaram", só os bons e dentro dos limites', () => {
+  settings.set('search_terms', 'chinelo | moda\nair fryer | cozinha\nfone bluetooth');
+  settings.set('ml_chrome_aprender', '1');
+  settings.set('ml_chrome_novos_por_dia', '30');
+  settings.set('ml_chrome_termos_max', '1000');
+  settings.set('ml_chrome_novos', '{}');
+  // O que a busca de verdade trouxe (2026-11-13)
+  const chinelo = [{ q: 'chinelo feminino', categoria: 'MLB23262' }, { q: 'chinelo masculino', categoria: 'MLB273770' },
+    { q: 'chinelo nuvem', categoria: 'MLB273770' }, { q: 'chinelo nike', categoria: 'MLB273770' }, { q: 'chinelo havaianas feminina', categoria: 'MLB273770' }];
+  const airFryer = [{ q: 'moldura de canto de teto', categoria: 'MLB418817' }, { q: 'air frayer', categoria: 'MLB456045' },
+    { q: 'air frier', categoria: 'MLB456045' }, { q: 'revestimento banheiro', categoria: null }];
+  const fone = [{ q: 'livros revistas comics', categoria: null }, { q: 'fone bluetooth com botão', categoria: 'MLB7457' }, { q: 'carros motos outros', categoria: null }];
+  assert.deepEqual(mlChrome.aprender('chinelo', chinelo), ['chinelo feminino', 'chinelo masculino', 'chinelo nuvem', 'chinelo nike', 'chinelo havaianas feminina']);
+  assert.deepEqual(mlChrome.aprender('air fryer', airFryer), [], 'sem relação com a busca ou erro de digitação de um termo que já existe');
+  assert.deepEqual(mlChrome.aprender('fone bluetooth', fone), ['fone bluetooth com botão'], 'sem categoria é lixo');
+  const termos = settings.getSearchTerms();
+  assert.deepEqual(termos.find(t => t.query === 'chinelo nuvem'), { query: 'chinelo nuvem', cat: 'moda' }, 'herda a categoria do termo de origem');
+  assert.deepEqual(mlChrome.aprender('chinelo', chinelo), [], 'não repete o que já entrou');
+  const e = mlChrome.estado().novos;
+  assert.equal(e.hoje, 6);
+  assert.equal(e.ultimos[0].q, 'fone bluetooth com botão');
+  // Limites: por dia e tamanho da lista
+  settings.set('ml_chrome_novos_por_dia', '7');
+  assert.equal(mlChrome.aprender('chinelo', [{ q: 'chinelo slide', categoria: 'MLB1' }, { q: 'chinelo infantil', categoria: 'MLB1' }]).length, 1);
+  settings.set('ml_chrome_novos_por_dia', '30');
+  settings.set('ml_chrome_termos_max', String(settings.getSearchTerms().length));
+  assert.deepEqual(mlChrome.aprender('chinelo', [{ q: 'chinelo couro', categoria: 'MLB1' }]), [], 'lista cheia');
+  settings.set('ml_chrome_termos_max', '1000');
+  settings.set('ml_chrome_aprender', '0');
+  assert.deepEqual(mlChrome.aprender('chinelo', [{ q: 'chinelo couro', categoria: 'MLB1' }]), [], 'desligado no painel');
+  settings.set('ml_chrome_aprender', '1');
+});
+
+test('a página de busca que a extensão traz já ensina os termos relacionados', () => {
+  settings.set('search_terms', 'sandalia | moda');
+  settings.set('ml_chrome_novos', '{}');
+  const texto = '0:{"optimizedResponse":{"results":[],"related_searches":@1}}\n'
+    + '1:{"q":"sandalia","related_searches":[{"q":"sandalia papete","category_id":"MLB273770","keyword_source":"X"},{"q":"carros motos outros","category_id":"UNKNOWN_CATEGORY"}]}\n';
+  mlChrome.receber({ query: 'sandalia', html: `_n.ctx.s["nr"].q(${JSON.stringify(texto)})` });
+  assert.deepEqual(settings.getSearchTerms().map(t => t.query), ['sandalia', 'sandalia papete']);
+});

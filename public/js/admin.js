@@ -678,7 +678,10 @@ function mlChromeLinha(m) {
   else if (!m.ativa) { texto = 'Parada: abra o Chrome com a extensão do Ofertou! e entre no Painel uma vez. Sem ela, só entram os produtos de catálogo do Mercado Livre.'; ruim = true; }
   else if (m.erro) { texto = `Problema na última busca: ${m.erro}. Abra o Mercado Livre neste Chrome e confira se está logado.`; ruim = true; }
   else texto = m.ultima ? `Ligada, buscando os ${m.termos} termos em rodízio · ${m.gravadas} ofertas gravadas de ${m.encontradas} lidas · último termo "${m.ultimo_termo}" em ${fmtDate(m.ultima.replace('T', ' ').slice(0, 19))}` : 'Ligada, esperando a primeira busca.';
-  return `<tr class="tab-msg"><td colspan="5" class="${ruim ? 'ruim' : ''}">🧩 Anúncios comuns pelo seu Chrome: ${esc(texto)}</td></tr>`;
+  const n = m.novos;
+  const aprendidos = n?.ligado && n.total
+    ? `<tr class="tab-msg"><td colspan="5">🌱 Termos novos aprendidos nas buscas: ${n.hoje} hoje, ${n.total} no total${n.ultimos?.length ? ` · últimos: ${esc(n.ultimos.slice(0, 6).map(x => x.q).join(', '))}` : ''}</td></tr>` : '';
+  return `<tr class="tab-msg"><td colspan="5" class="${ruim ? 'ruim' : ''}">🧩 Anúncios comuns pelo seu Chrome: ${esc(texto)}</td></tr>${aprendidos}`;
 }
 
 async function loadStores() {

@@ -1075,6 +1075,9 @@
             <label class="field">Minerar a cada (minutos) <input type="number" name="mining_interval_min" min="15" max="1440"></label>
             <label class="field">Termos por rodada (rodízio) <input type="number" name="mining_terms_per_run" min="5" max="500"></label>
             <label class="field">Mercado Livre: categorias varridas por rodada <input type="number" name="ml_categorias_por_rodada" min="0" max="1000" title="Além dos termos, percorre a árvore de categorias do Mercado Livre e minera os mais vendidos de cada uma (0 = desliga)"></label>
+            <label class="field">Aprender termos novos nas buscas do ML <select name="ml_chrome_aprender"><option value="1">Sim</option><option value="0">Não</option></select></label>
+            <label class="field">Termos novos por dia (no máximo) <input type="number" name="ml_chrome_novos_por_dia" min="0" max="500"></label>
+            <label class="field">Tamanho máximo da lista de termos <input type="number" name="ml_chrome_termos_max" min="0" max="5000"></label>
             <label class="field">Tirar do ar se não for vista há (horas) <input type="number" name="offer_max_age_hours" min="1" max="168"></label>
             <label class="field">Desconto mínimo (%) <input type="number" name="min_discount_pct" min="1" max="90"></label>
             <label class="field">Validade padrão de ofertas manuais (dias) <input type="number" name="manual_offer_days" min="1" max="60"></label>
@@ -2266,7 +2269,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
 </dialog>
 
 <script src="/js/menu-celular.js?v=20261335"></script>
-<script src="/js/admin.js?v=20261336"></script>
+<script src="/js/admin.js?v=20261337"></script>
 <script src="/js/wa-temas.js?v=20261335"></script>
 <script src="/js/envio-resultados.js?v=20261335"></script>
 <script src="/js/wa-proprio.js?v=20261335"></script>
