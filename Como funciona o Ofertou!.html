@@ -1,0 +1,655 @@
+<title>Como funciona o Ofertou!</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: manual de referência, com índice fixo à esquerda no computador e coluna única no celular. Cores iguais às do site. */
+:root {
+  --bg: #f2f7f3; --surface: #ffffff; --surface-2: #f4f9f5; --surface-3: #e7f0e9;
+  --ink: #161b18; --ink-2: #3f4843; --ink-3: #646d68;
+  --line: #dbe6dd; --line-strong: #c1d0c4;
+  --brand: #0a7a43; --brand-strong: #075f34; --brand-soft: #dff2e6;
+  --azul: #0d6985; --azul-soft: #e2f1f5; --azul-texto: #0d6985;
+  --gold: #9a6800; --gold-soft: #fff4d6;
+  --deal: #d23b2a; --deal-soft: #fdecea;
+  --sobre-degrade: #ffffff;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1210; --surface: #161b18; --surface-2: #1b211d; --surface-3: #222924;
+  --ink: #edf1ee; --ink-2: #b7c0ba; --ink-3: #87918b;
+  --line: #262d28; --line-strong: #343c36;
+  --brand: #2bb673; --brand-strong: #49c98a; --brand-soft: #16301f;
+  --azul-soft: #12303a; --azul-texto: #5cc4dd;
+  --gold: #e6b143; --gold-soft: #33290f;
+  --deal: #ff6b5a; --deal-soft: #3a1c18; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0e1210; --surface: #161b18; --surface-2: #1b211d; --surface-3: #222924;
+  --ink: #edf1ee; --ink-2: #b7c0ba; --ink-3: #87918b;
+  --line: #262d28; --line-strong: #343c36;
+  --brand: #2bb673; --brand-strong: #49c98a; --brand-soft: #16301f;
+  --azul-soft: #12303a; --azul-texto: #5cc4dd;
+  --gold: #e6b143; --gold-soft: #33290f;
+  --deal: #ff6b5a; --deal-soft: #3a1c18; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.6; }
+.faixa-topo { height: 3px; background: linear-gradient(90deg, #0a7a43, #0d6985 60%, #0b6bb5); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 32px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 20px 60px; } }
+
+/* Índice */
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; font-size: 14px; }
+nav.toc .marca { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; margin-bottom: 16px; }
+nav.toc .marca { color: var(--brand); }
+nav.toc .marca i { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #0a7a43, #0d6985); color: var(--sobre-degrade); display: grid; place-items: center; font-style: normal; font-size: 15px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; counter-reset: t; }
+nav.toc a { display: flex; gap: 10px; padding: 6px 10px; border-radius: 8px; color: var(--ink-2); text-decoration: none; }
+nav.toc a::before { counter-increment: t; content: counter(t, decimal-leading-zero); font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-3); padding-top: 2px; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--azul-soft); color: var(--ink); outline: none; }
+nav.toc a.atual { background: linear-gradient(90deg, #0a7a43, #0d6985); color: var(--sobre-degrade); font-weight: 700; }
+nav.toc a.atual::before { color: var(--sobre-degrade); }
+@media (max-width: 900px) {
+  nav.toc { position: static; max-height: none; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); }
+  nav.toc a { min-height: 44px; align-items: center; }
+}
+
+/* Conteúdo */
+main { min-width: 0; }
+header.capa { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--azul-texto); }
+h1 { font-size: clamp(32px, 5vw, 46px); line-height: 1.08; margin: 8px 0 14px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--brand); background: linear-gradient(90deg, var(--brand), var(--azul-texto)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.lead { font-size: 18.5px; color: var(--ink-2); max-width: 66ch; margin: 0; }
+.meta { margin-top: 16px; font-size: 13.5px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+section { padding-top: 40px; scroll-margin-top: 16px; }
+h2 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; font-weight: 800; letter-spacing: -.01em; text-wrap: balance; display: flex; align-items: baseline; gap: 12px; color: var(--brand); }
+h2 .n { font-family: var(--f-mono); font-size: 14px; font-weight: 500; color: var(--azul-texto); }
+h2 + .sub { color: var(--ink-3); margin: 0 0 18px; max-width: 66ch; }
+h3 { font-size: 18px; margin: 26px 0 8px; font-weight: 700; }
+p, li { max-width: 70ch; }
+p { margin: 0 0 12px; }
+ul, ol.passos { margin: 0 0 14px; padding-left: 22px; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--azul-texto); }
+b, strong { font-weight: 700; }
+code, .rota { font-family: var(--f-mono); font-size: .86em; background: var(--surface-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+a { color: var(--azul-texto); }
+
+/* Tabelas */
+.tabela { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin: 6px 0 18px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); background: var(--surface-2); font-weight: 700; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; font-weight: 600; }
+
+/* Papéis (quem usa) */
+.papeis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; margin: 8px 0 18px; }
+.papel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+.papel h4 { margin: 0 0 4px; font-size: 16px; }
+.papel .onde { font-family: var(--f-mono); font-size: 12px; color: var(--azul-texto); }
+.papel p { margin: 8px 0 0; font-size: 14.5px; color: var(--ink-2); }
+
+/* Fluxo em etapas */
+.fluxo { list-style: none; padding: 0; margin: 10px 0 18px; display: grid; gap: 0; counter-reset: f; }
+.fluxo li { counter-increment: f; position: relative; padding: 0 0 16px 46px; max-width: none; margin: 0; }
+.fluxo li::before { content: counter(f); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--azul-soft); color: var(--azul-texto); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+.fluxo li::after { content: ""; position: absolute; left: 14.5px; top: 32px; bottom: 2px; width: 1px; background: var(--line-strong); }
+.fluxo li:last-child::after { display: none; }
+.fluxo li > b { display: block; }
+.fluxo span { color: var(--ink-2); font-size: 15px; }
+
+/* Avisos */
+.nota { border-radius: 12px; padding: 14px 16px; margin: 8px 0 18px; font-size: 15px; background: var(--azul-soft); color: var(--ink); }
+.nota.ouro { background: var(--gold-soft); }
+.nota.alerta { background: var(--deal-soft); }
+.nota b:first-child { display: block; margin-bottom: 2px; }
+.nota p:last-child, .nota ul:last-child { margin-bottom: 0; }
+
+/* Situação atual */
+.status { display: grid; gap: 8px; margin: 8px 0 18px; }
+.item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.chip { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.chip.ok { background: var(--brand-soft); color: var(--brand-strong); }
+.chip.falta { background: var(--gold-soft); color: var(--gold); }
+.chip.bloq { background: var(--deal-soft); color: var(--deal); }
+.item p { margin: 0; font-size: 15px; }
+.item p b { display: block; }
+
+.rodape { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 13.5px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="faixa-topo"></div>
+<div class="wrap">
+  <nav class="toc" aria-label="Índice">
+    <div class="marca"><i>O!</i> Ofertou!</div>
+    <ol>
+      <li><a href="#visao">Visão geral</a></li>
+      <li><a href="#quem">Quem usa o site</a></li>
+      <li><a href="#paginas">Mapa das páginas</a></li>
+      <li><a href="#entrada">Entrada e cadastro</a></li>
+      <li><a href="#ofertas">Ofertas e mineração</a></li>
+      <li><a href="#afiliados">Links de afiliado</a></li>
+      <li><a href="#lojas">Lojas parceiras</a></li>
+      <li><a href="#pedidos">Pedidos e pagamentos</a></li>
+      <li><a href="#pro">Afiliado Pro</a></li>
+      <li><a href="#parceiros">Termos do Parceiro</a></li>
+      <li><a href="#planos">Planos e assinaturas</a></li>
+      <li><a href="#postagens">Postagens nas redes</a></li>
+      <li><a href="#whatsapp">WhatsApp (API própria)</a></li>
+      <li><a href="#perfis">Perfis e comunidade</a></li>
+      <li><a href="#cosmeticos">Cosméticos e moedas</a></li>
+      <li><a href="#mensagens">Mensagens, SAC e moderação</a></li>
+      <li><a href="#publicidade">Publicidade</a></li>
+      <li><a href="#admin">Painel do administrador</a></li>
+      <li><a href="#equipe">Equipe (staff)</a></li>
+      <li><a href="#seguranca">Segurança e LGPD</a></li>
+      <li><a href="#lei">Lei brasileira</a></li>
+      <li><a href="#app">App de celular</a></li>
+      <li><a href="#tecnica">Parte técnica</a></li>
+      <li><a href="#situacao">Situação atual</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="capa">
+      <div class="eyebrow">Manual do site</div>
+      <h1>Como funciona o <em>Ofertou!</em></h1>
+      <p class="lead">O Ofertou! reúne ofertas reais das maiores lojas on-line do Brasil, divulga essas ofertas com os seus links de afiliado e dá espaço para lojas parceiras venderem dentro do site. Este manual, feito para o administrador, explica cada parte, quem usa e como tudo se conecta.</p>
+      <div class="meta"><span>Atualizado em 06/11/2026</span><span>Site: tanoofertou.com.br</span><span>Contato: tanoofertou@gmail.com</span></div>
+    </header>
+
+    <section id="visao">
+      <h2><span class="n">01</span>Visão geral</h2>
+      <p class="sub">O que o site faz e de onde vem o dinheiro.</p>
+      <p>O site faz quatro coisas ao mesmo tempo:</p>
+      <ul>
+        <li><b>Encontra ofertas sozinho.</b> Um robô (a <b>mineração</b>) busca produtos com desconto no Mercado Livre, Amazon, Shopee, Magalu, AliExpress e KaBuM!, e você pode cadastrar ofertas de qualquer outra loja à mão (Shein, Temu…).</li>
+        <li><b>Divulga essas ofertas</b> no site e nas redes (WhatsApp pela API própria, Telegram, Facebook, Instagram, X), sempre com o seu link de afiliado.</li>
+        <li><b>Hospeda lojas parceiras.</b> Empresas e pessoas físicas criam uma loja dentro do site, anunciam produtos e recebem os pedidos pagos <b>direto na conta do Mercado Pago delas</b>.</li>
+        <li><b>Vende acesso.</b> Planos pagos para lojas parceiras e para afiliados que querem usar a ferramenta com os próprios links.</li>
+      </ul>
+      <h3>Fontes de receita</h3>
+      <div class="tabela"><table>
+        <thead><tr><th>Fonte</th><th>Como funciona</th></tr></thead>
+        <tbody>
+          <tr><td>Comissões de afiliado</td><td>Cada compra feita por um link do site gera comissão nos programas da Amazon, Mercado Livre, Shopee, AliExpress, KaBuM! e Magalu. Você acompanha em Painel → Ganhos.</td></tr>
+          <tr><td>Assinaturas</td><td>Planos pagos (Loja Parceira, Afiliado Pro e os que você criar), cobrados pelo Mercado Pago (Pix ou cartão, inclusive cartão salvo).</td></tr>
+          <tr><td>Taxa de uso do site</td><td>Padrão de 1% somado a cada pedido às lojas parceiras. O Mercado Pago separa essa taxa na hora e manda para a sua conta; o resto vai para a loja.</td></tr>
+          <tr><td>Publicidade</td><td>Banners de empresas, <b>vídeos patrocinados</b> (que dão moedas a quem assiste) e, onde não houver campanha, anúncios do Google AdSense.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="nota"><b>O que o Ofertou! não faz</b>O site divulga ofertas. Ele não fabrica, não estoca e não entrega produtos, e não guarda dinheiro das vendas das lojas. Venda, entrega, troca e garantia são responsabilidade da loja vendedora. Isso está nos Termos de Uso que todo mundo aceita, e lojistas e afiliados aceitam ainda os <a href="#parceiros">Termos do Parceiro</a>, com direito de regresso.</div>
+    </section>
+
+    <section id="quem">
+      <h2><span class="n">02</span>Quem usa o site</h2>
+      <p class="sub">Cada tipo de conta vê uma parte diferente do site.</p>
+      <div class="papeis">
+        <div class="papel"><h4>Consumidor</h4><div class="onde">/ e /conta</div><p>Vê as ofertas, segue lojas e perfis, faz pedidos às lojas parceiras, conversa com elas e personaliza o perfil com moedas. Tem um plano grátis sem vencimento.</p></div>
+        <div class="papel"><h4>Loja parceira</h4><div class="onde">/conta → Minha loja</div><p>Empresa (CNPJ) ou pessoa física (CPF). Tem página própria, anúncios, catálogos, pedidos, painel de vendas e conecta a própria conta do Mercado Pago.</p></div>
+        <div class="papel"><h4>Afiliado Pro</h4><div class="onde">/cliente</div><p>Usa as ofertas mineradas pelo site com os links de afiliado dele e posta nos canais dele, com o próprio WhatsApp conectado pelo QR code. Acesso pessoal, que não pode ser revendido.</p></div>
+        <div class="papel"><h4>Equipe (staff)</h4><div class="onde">/trabalho</div><p>Pessoas com cargo (Gerente, Admin, Moderador, Suporte) que atendem o SAC, moderam o chat, postam ofertas ou gerenciam a equipe. Nunca entram no painel admin.</p></div>
+        <div class="papel"><h4>Administrador</h4><div class="onde">/admin</div><p>Você (Proprietário). Configura tudo, aprova cadastros, acompanha dinheiro, mineração, pedidos e atendimento. Também vê as áreas de Afiliado e Loja parceira em modo de visualização.</p></div>
+      </div>
+    </section>
+
+    <section id="paginas">
+      <h2><span class="n">03</span>Mapa das páginas</h2>
+      <p class="sub">Todos os endereços do site e para que serve cada um.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Endereço</th><th>O que é</th></tr></thead>
+        <tbody>
+          <tr><td><span class="rota">/conta</span></td><td>Página inicial para quem não entrou: apresentação, números ao vivo, planos, comparativo, perguntas frequentes, entrar e criar conta. Depois de entrar, vira <b>Minha conta</b> (perfil, dados, loja, anúncios, pedidos, mensagens, cartões, senha e, para a equipe, a Área da equipe).</td></tr>
+          <tr><td><span class="rota">/</span></td><td>Lista de ofertas com busca, filtros por loja, categoria e desconto, abas das lojas mineradas e o quadro da Comunidade. Exige login (configurável). Passar o mouse na sua foto, no topo, mostra a prévia do seu perfil.</td></tr>
+          <tr><td><span class="rota">/central</span></td><td>Tudo numa guia só: um menu de áreas (Ofertas, Postagens, Afiliado, Loja, Minha conta, Equipe, Painel admin) abre cada tela dentro da mesma guia. Quem tem área de trabalho cai aqui ao entrar.</td></tr>
+          <tr><td><span class="rota">/ofertas/…</span></td><td>Páginas de categoria, tipo de produto e marca, feitas para o Google (ex.: <span class="rota">/ofertas/celulares</span>).</td></tr>
+          <tr><td><span class="rota">/oferta/123</span></td><td>Passagem para a oferta: conta o clique e manda para a loja com o seu link de afiliado.</td></tr>
+          <tr><td><span class="rota">/o/123</span></td><td>Link curto usado nas postagens. Mostra a prévia com foto no WhatsApp e leva a pessoa para a oferta.</td></tr>
+          <tr><td><span class="rota">/p/código</span></td><td>Link de cada envio a um grupo de WhatsApp. Conta o clique daquele grupo e segue para o destino normal.</td></tr>
+          <tr><td><span class="rota">/ir/…</span></td><td>Passagem dos links dos afiliados: conta o clique e manda para a loja com o link de afiliado da pessoa.</td></tr>
+          <tr><td><span class="rota">/cupons</span></td><td>A própria página de ofertas, com os cupons ativos no lugar dos produtos. Abre também pela opção Cupons, nos filtros, e é o destino do "Ver mais" da lista postada.</td></tr>
+          <tr><td><span class="rota">/grupo</span> e <span class="rota">/g/nome</span></td><td>Página de captação de grupos do site e de cada afiliado. O botão leva ao próximo grupo que ainda não lotou.</td></tr>
+          <tr><td><span class="rota">/ferramenta</span></td><td>Página de apresentação da ferramenta para afiliados.</td></tr>
+          <tr><td><span class="rota">/assinar</span></td><td>Compra ou renovação de um plano: dados, aceites e pagamento.</td></tr>
+          <tr><td><span class="rota">/loja/nome</span></td><td>Página profissional de uma loja parceira: produtos, catálogos, avaliações e "Sobre".</td></tr>
+          <tr><td><span class="rota">/anuncio/123</span></td><td>Página de um anúncio de loja parceira, com galeria e ficha técnica.</td></tr>
+          <tr><td><span class="rota">/perfil/nome</span></td><td>Perfil de uma pessoa ou empresa: foto, moldura, efeitos, capa, conquistas, links e seguidores.</td></tr>
+          <tr><td><span class="rota">/cosmeticos</span></td><td>Loja de cosméticos (também abre como janela dentro de Editar perfil): molduras animadas, efeitos de perfil e de nome, missões e vídeos para ganhar moedas.</td></tr>
+          <tr><td><span class="rota">/mensagens</span></td><td>Conversas, pedidos e o Suporte. Também abre como painel pelo botão no canto da tela.</td></tr>
+          <tr><td><span class="rota">/trabalho</span></td><td>Área de trabalho da equipe: SAC, Moderação do chat, Equipe e o <b>Guia da equipe</b>, conforme o cargo.</td></tr>
+          <tr><td><span class="rota">/sac</span></td><td>Fila de atendimento do SAC (também abre dentro da Área de trabalho).</td></tr>
+          <tr><td><span class="rota">/postagens</span></td><td>Tela para postar as ofertas escolhidas nas redes.</td></tr>
+          <tr><td><span class="rota">/cliente</span></td><td>Painel do Afiliado Pro.</td></tr>
+          <tr><td><span class="rota">/anuncie</span></td><td>Página para empresas que querem anunciar banners no site.</td></tr>
+          <tr><td><span class="rota">/ajuda</span></td><td>Guia do usuário (para clientes, lojas e afiliados).</td></tr>
+          <tr><td><span class="rota">/privacidade</span></td><td>Termos de Uso (com o item 6-A, Termos do Parceiro) e Política de Privacidade.</td></tr>
+          <tr><td><span class="rota">/admin</span></td><td>Painel do administrador.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="entrada">
+      <h2><span class="n">04</span>Entrada e cadastro</h2>
+      <p class="sub">O caminho de uma pessoa desde a primeira visita até ver as ofertas.</p>
+      <ol class="fluxo">
+        <li><b>Chega em /conta</b><span>Quem não está conectado sempre cai na página inicial. Por padrão, as ofertas só aparecem para quem entrou (dá para abrir ao público em Painel → Usuários → "Quem pode ver as ofertas").</span></li>
+        <li><b>Cria a conta</b><span>Com e-mail e senha, com o Google ou pelo <b>Cadastro rápido</b> (nome, celular e senha). A senha precisa seguir o padrão de segurança (ver a seção Segurança). A pessoa também pode ir direto para um plano e se cadastrar na tela de compra.</span></li>
+        <li><b>Escolhe o perfil</b><span>Consumidor, Empresarial ou Usuário da ferramenta.</span></li>
+        <li><b>Preenche os dados e aceita os termos</b><span>Nome, CPF, nascimento (18+), celular e endereço (o CEP preenche rua, bairro, cidade e estado). Lojas escolhem <b>Pessoa jurídica</b> (o CNPJ puxa os dados da Receita) ou <b>Pessoa física</b> (vende com o CPF). Caixas obrigatórias, nunca pré-marcadas: Privacidade (LGPD), Termos de Uso e, para Empresarial e Usuário da ferramenta, os <b>Termos do Parceiro</b>.</span></li>
+        <li><b>É liberada</b><span>Com plano pago ou grátis, a conta é liberada na hora. Sem plano, entra na fila de aprovação do Painel → Usuários (cada tipo pode ser Aberto, Com aprovação ou Fechado).</span></li>
+        <li><b>Usa o site</b><span>Consumidor vai para as ofertas. Loja nova vai direto para <b>Minha loja</b>; o Painel da loja aparece depois que ela salva a loja. Afiliado com a ferramenta vai para <span class="rota">/cliente</span>. Quem tem área de trabalho usa tudo pela <span class="rota">/central</span>.</span></li>
+      </ol>
+      <h3>Ficar conectado</h3>
+      <ul>
+        <li>Plano pago: durante todo o prazo contratado. Ao vencer, aparece o botão <b>Reativar plano</b>.</li>
+        <li>Conta gratuita: enquanto usar o site (sai após 6 meses sem uso).</li>
+        <li>Esqueci minha senha: link por e-mail que vale 1 hora e funciona uma vez. Contas do cadastro rápido sem e-mail precisam do seu atendimento.</li>
+        <li>Administrador: 30 dias sem uso. Para entrar como admin, digite <code>admin</code> no campo de e-mail da tela /conta.</li>
+      </ul>
+    </section>
+
+    <section id="ofertas">
+      <h2><span class="n">05</span>Ofertas e mineração</h2>
+      <p class="sub">Como as ofertas entram no site, ficam atualizadas e saem do ar.</p>
+      <h3>A mineração</h3>
+      <ul>
+        <li>Roda sozinha a cada <b>120 minutos</b>. A quantidade de termos por rodada é ajustável em Painel → Mineração, e a rodada seguinte continua de onde a anterior parou.</li>
+        <li>Lojas mineradas: <b>Mercado Livre, Amazon, Shopee, Magalu, AliExpress e KaBuM!</b>. Cada uma pode ser ligada ou desligada em Painel → Mineração. Shein e Temu entram só à mão.</li>
+        <li><b>Categoria Promoção relâmpago:</b> a primeira da lista, com o que a loja marcou e o que acaba antes na frente. Quando a loja informa o fim, o cartão mostra o tempo que falta. A queda de preço fica de fora, porque não tem hora para acabar.</li>
+        <li><b>Radar de relâmpago:</b> rotina leve em Painel → Mineração. KaBuM! (5 min) e Amazon (20 min) marcam a oferta; Shopee (10 min), Magalu e AliExpress (15 min) contam com a queda de preço, e a AliExpress também com as promoções "flash", quando a conta tiver esse acesso. Toda leitura de qualquer loja também detecta queda: pelo menos 15%, desconto de 20% ou mais e o menor preço em 30 dias. Quando a loja bloqueia, o radar espera 2 horas.</li>
+        <li><b>Coletar agora:</b> até 10 páginas de ofertas relâmpago, comissão extra com 10 rolagens e os cupons ativos, com os produtos de cada um, salvos com o link de afiliado. As páginas da central de cupons são lidas por trás, 3 de cada vez, e os cupons não ativos são ignorados.</li>
+        <li><b>Extensão do Chrome:</b> uma só para ofertas relâmpago, cupons, comissão extra e ganho estimado. O download fica em Painel → Mineração → Extensão do Chrome, que mostra se a versão do navegador está atualizada. O .zip é montado na hora, da pasta extensao-comissao, então sai sempre na versão atual.</li>
+        <li><b>Coleta do Mercado Livre:</b> às 9h, 14h e 20h o sino avisa e um aviso fixo aparece no painel. Ele só some depois que a extensão entregar as ofertas e os cupons daquele período.</li>
+        <li><b>Mercado Livre:</b> além dos termos, varre os mais vendidos da árvore de categorias, em rodízio.</li>
+        <li><b>Termos novos:</b> o que as pessoas pesquisam e não existe na lista entra nela e é minerado na hora.</li>
+        <li><b>Palavras proibidas:</b> em Painel → Mineração, uma lista que você edita (armas, drogas, cigarros, sex shop…). A mineração, o radar e a extensão não trazem esses produtos. Vale a palavra inteira, com ou sem acento e no plural com s ou es. O que já estava no ar sai na hora e volta se a palavra for retirada. Ofertas à mão e de lojas parceiras não passam pela lista.</li>
+        <li><b>Cupons:</b> a mineração lê os cupons da KaBuM! e da Magalu. Os do Mercado Livre vêm pela extensão do Chrome, que também pode aplicar os cupons sozinha. Ela lê os cupons e os produtos deles sem abrir as páginas: a lista que não abrir é pulada, e o painel mostra quantas foram. Se o Mercado Livre pedir verificação, a leitura para e entrega o que já veio.</li>
+        <li><b>Comissão:</b> Shopee e AliExpress informam a comissão pela API. A extensão do Chrome traz a comissão extra do Mercado Livre.</li>
+        <li>Só entram produtos com desconto real de pelo menos <b>5%</b> (preço riscado da própria loja).</li>
+        <li>Cada oferta fica no ar por <b>24 horas</b>. Se a mineração encontrar de novo, ela é renovada. Ofertas manuais ficam 3 dias (ou o prazo que você escolher).</li>
+        <li>A categoria é decidida pelo título do produto (ex.: "Cadeira Gamer" vai para Games).</li>
+        <li>Também dá para minerar na hora: botão <b>Minerar agora</b> no painel, ou digitar um produto em "Buscar produto nas lojas…" na barra de postagens.</li>
+        <li>Enquanto a mineração roda, a <b>Capi minerando</b> pode aparecer no canto da tela (configurável em Painel → Mineração → Capi minerando).</li>
+      </ul>
+      <h3>Na tela de ofertas</h3>
+      <ul>
+        <li>Busca, filtros por loja, categoria e desconto, e páginas carregadas pelo servidor (o site fica leve mesmo com milhares de ofertas).</li>
+        <li>As abas das lojas mostram só as lojas mineradas que têm produtos no momento. As lojas parceiras aparecem na Comunidade e nas próprias páginas.</li>
+        <li>Cada cartão mostra preço atual, preço anterior, desconto, logo da loja, selo <b>Preço verificado</b>, selo <b>Menor preço</b> e cupom, quando houver. O clique é contado e vai para a loja com o seu link de afiliado.</li>
+        <li><b>Descontos suspeitos</b> ficam no site, mas não viram destaque e caem na ordem. Confira em Painel → Ofertas.</li>
+        <li><b>Fotos:</b> os cartões usam uma cópia menor (<span class="rota">/img/p/</span>), guardada em <code>data/cache-img</code> por 3 dias. As fotos da Magalu vão direto do navegador para ela, no tamanho menor.</li>
+      </ul>
+      <div class="nota ouro"><b>Bloqueios das lojas</b>As lojas às vezes bloqueiam buscas automáticas por um tempo (a Amazon faz isso com frequência). O Painel → Mineração mostra a situação de cada loja. O site não tenta driblar esses bloqueios: ele espera e tenta de novo na rodada seguinte.</div>
+    </section>
+
+    <section id="afiliados">
+      <h2><span class="n">06</span>Links de afiliado</h2>
+      <p class="sub">Configurados em Painel → Links de afiliado. Ao salvar, os links de todas as ofertas são atualizados.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Loja</th><th>O que é preciso</th></tr></thead>
+        <tbody>
+          <tr><td>Amazon</td><td>A tag de associado (ex.: <code>seunome-20</code>).</td></tr>
+          <tr><td>Mercado Livre</td><td><code>matt_word</code> e <code>matt_tool</code> do programa de afiliados. App ID e chave secreta deixam a mineração mais estável.</td></tr>
+          <tr><td>Shopee</td><td>ID de afiliado e, para minerar e sincronizar as vendas, App ID e senha da Open API.</td></tr>
+          <tr><td>AliExpress</td><td>App Key, App Secret e Tracking ID. Sem isso, a loja é minerada, mas os links vão sem comissão.</td></tr>
+          <tr><td>KaBuM!</td><td>Um link de afiliado de qualquer produto, usado como modelo.</td></tr>
+          <tr><td>Magalu</td><td>O nome da sua loja Magazine Você.</td></tr>
+          <tr><td>Shein, Temu e outras</td><td>O link de afiliado é colado na própria oferta manual.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="lojas">
+      <h2><span class="n">07</span>Lojas parceiras</h2>
+      <p class="sub">Empresas e pessoas físicas que vendem dentro do site.</p>
+      <h3>O que a loja tem</h3>
+      <ul>
+        <li><b>Página da loja</b> (<span class="rota">/loja/nome</span>): banner, logo, cor, frase de destaque, selo de verificada, nota em estrelas, seguidores, botões de contato, abas de produtos por catálogo, avaliações e "Sobre a loja".</li>
+        <li><b>Minha loja:</b> editor da página, catálogos e respostas às avaliações. A <b>logo da loja e a foto do perfil são sempre a mesma imagem</b>: trocar uma troca a outra.</li>
+        <li><b>Anúncios:</b> criador com até 6 fotos, preços, parcelamento, cupom, frete, estoque, garantia e prévia ao vivo. Cada anúncio ganha a página <span class="rota">/anuncio/123</span>.</li>
+        <li><b>Importação automática:</b> pelo link da loja (Shopify, WooCommerce ou feed do Google Shopping, como Nuvemshop, Tray, Loja Integrada e VTEX). Atualiza a cada 2 horas e só traz produtos com preço promocional informado pela loja.</li>
+        <li><b>Menu lateral</b> no mesmo padrão do painel do afiliado, com os grupos Essencial, Atendimento e Minha conta.</li>
+        <li><b>Painel da loja:</b> vendas, ticket médio, acessos, avaliação, pendências, gráfico, funil, checklist de configuração, mais vendidos e últimos pedidos.</li>
+        <li><b>Avaliações:</b> 1 a 5 estrelas, uma por pessoa; quem comprou pelo site aparece com "Compra verificada". A loja responde, mas não apaga. Só você oculta avaliações, e só por abuso (ofensa, dados pessoais, spam, falsa, ilegal ou sem relação), escolhendo o motivo; o autor é avisado.</li>
+      </ul>
+      <h3>Pessoa física ou jurídica</h3>
+      <ul>
+        <li><b>Pessoa jurídica:</b> ao digitar o CNPJ, os dados da empresa vêm sozinhos da Receita Federal. Se a empresa não estiver "ATIVA", aparece um aviso.</li>
+        <li><b>Pessoa física:</b> não pede CNPJ nem razão social. A loja fica no nome e CPF da pessoa. O CPF só é validado; os dados de pessoas não podem ser consultados (LGPD).</li>
+      </ul>
+    </section>
+
+    <section id="pedidos">
+      <h2><span class="n">08</span>Pedidos e pagamentos</h2>
+      <p class="sub">Modelo marketplace: o cliente paga direto na conta do Mercado Pago da loja.</p>
+      <ol class="fluxo">
+        <li><b>A loja conecta o Mercado Pago</b><span>Em Minha conta → Vendas e pagamentos → <b>Conectar minha conta do Mercado Pago</b>. Só com a conta conectada o botão "Fazer pedido" aparece nos produtos. A conexão é renovada sozinha.</span></li>
+        <li><b>O cliente faz o pedido</b><span>Na prévia do produto: quantidade, forma de pagamento e observações. O total já mostra a taxa de uso do site (1%) separada.</span></li>
+        <li><b>Paga na mesma janela</b><span><b>Pix:</b> QR code e copia e cola (vale 60 minutos). <b>Cartão:</b> formulário do Mercado Pago com parcelas. Os dados do cartão vão direto para o Mercado Pago.</span></li>
+        <li><b>O dinheiro cai na conta da loja</b><span>O Mercado Pago separa a sua taxa na hora e manda para a sua conta. O resto fica com a loja, nos prazos do Mercado Pago dela. Não há carteira nem saques para você pagar.</span></li>
+        <li><b>O pedido chega na conversa com a loja</b><span>Só depois de pago. A loja recebe aviso no sino, na conversa e por e-mail. O pedido vira o ticket PD-000123.</span></li>
+        <li><b>A loja envia e conclui</b><span>Pago → enviado → concluído. Se a loja cancelar depois de pago, o Mercado Pago devolve o dinheiro ao cliente pela conta da loja (a taxa volta junto, na proporção).</span></li>
+      </ol>
+      <div class="nota"><b>Para ativar (uma vez só)</b>Crie uma aplicação marketplace no Mercado Pago Developers, cadastre o endereço de retorno que aparece em Painel → Lojas e pedidos e cole ali o <b>Client ID</b> e o <b>Client Secret</b>. O site precisa estar no ar com https.</div>
+    </section>
+
+    <section id="pro">
+      <h2><span class="n">09</span>Afiliado Pro (clientes da ferramenta)</h2>
+      <p class="sub">Para quem quer vender as ofertas do site com os próprios links.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Grupo do menu</th><th>Telas</th></tr></thead>
+        <tbody>
+          <tr><td>Essencial</td><td><b>Dashboard</b> (primeiros passos, números, sugestões do dia, o que está em alta), <b>Escolher ofertas</b>, <b>Postagens</b>, <b>Agendamento</b> e <b>WhatsApp</b>.</td></tr>
+          <tr><td>Relatórios</td><td><b>Comissão</b> (Shopee sincroniza sozinha; outras lojas por planilha; a receber e saques por loja), <b>Membros</b> e <b>Envios</b> (entrega, falhas e cliques).</td></tr>
+          <tr><td>Configurações</td><td><b>Site do grupo</b>, <b>Links de afiliado</b>, <b>Redes e mensagem</b>, <b>Minha conta</b> e <b>Meu perfil</b>.</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>Ele nunca vê nem usa as suas chaves, links ou canais. Se faltar o link de uma loja, as ofertas dela vão sem comissão (nunca com a sua).</li>
+        <li>Cada afiliado conecta o próprio número na aba <b>WhatsApp</b>, com conversas e chave de API separadas das suas. As conversas dele ficam guardadas no seu servidor por 30 dias.</li>
+        <li>Você cadastra, renova (+30 dias), bloqueia, troca a senha ou exclui em Painel → Clientes. Ao vencer, o acesso, o agendamento e a conexão do WhatsApp param.</li>
+        <li><b>Acesso pessoal:</b> o afiliado não pode revender, alugar ou compartilhar o acesso (Termos do Parceiro). Quem você cadastra pelo painel aceita esses termos na primeira vez que entra; sem o aceite, o painel não funciona.</li>
+      </ul>
+      <div class="nota ouro"><b>Para o seu servidor</b>Cada afiliado conectado mantém uma conexão aberta na VPS. Com poucos não deve pesar, mas ainda não foi medido. Acompanhe se o número crescer muito.</div>
+    </section>
+
+    <section id="parceiros">
+      <h2><span class="n">10</span>Termos do Parceiro (lojistas e afiliados)</h2>
+      <p class="sub">Item 6-A dos Termos de Uso, em <span class="rota">/privacidade#parceiros</span>.</p>
+      <ul>
+        <li><b>Responsabilidade exclusiva:</b> a loja responde pelos produtos, pelos prazos (entrega, troca, atendimento) e pelos direitos dos consumidores; o afiliado responde pelo que divulga, pelos links e pelas regras de publicidade, dos programas de afiliados e da LGPD.</li>
+        <li><b>Isenção do site:</b> na relação com o parceiro, o Ofertou! não responde pelos descumprimentos dele. Os direitos dos consumidores não são limitados (a lei não permite).</li>
+        <li><b>Direito de regresso:</b> se o site for reclamado, multado, processado ou tiver de pagar algo por culpa do parceiro, o parceiro ressarce tudo (valor, custas, honorários e multas) em até 15 dias da notificação, e tem 5 dias úteis para mandar os documentos da defesa.</li>
+        <li><b>Acesso pessoal:</b> é proibido revender, alugar, emprestar ou compartilhar a conta, o painel ou a ferramenta. A punição vai até o encerramento do acesso sem reembolso do período restante.</li>
+      </ul>
+      <ol class="fluxo">
+        <li><b>No cadastro e na compra</b><span>Empresarial e Usuário da ferramenta marcam uma caixa a mais (Termos do Lojista ou do Afiliado). O mesmo vale na compra de planos de empresa ou com a ferramenta.</span></li>
+        <li><b>Quem já era parceiro</b><span>Vê uma janela ao entrar em Minha conta ou no painel do afiliado e só continua depois de aceitar (ou sai da conta).</span></li>
+        <li><b>Prova</b><span>Cada aceite fica na ficha do usuário (Painel → Usuários), com data, versão, IP e "Termos do Parceiro (lojista/afiliado)".</span></li>
+      </ol>
+      <div class="nota ouro"><b>Revisão jurídica</b>As cláusulas foram escritas com base no CDC, no Código Civil e na LGPD, mas vale pedir a um advogado para revisar antes do lançamento. Se mudar o item 6-A, troque <code>VERSAO_PARCEIRO</code> em <code>src/consentimento.js</code> para todos aceitarem de novo.</div>
+    </section>
+
+    <section id="planos">
+      <h2><span class="n">11</span>Planos e assinaturas</h2>
+      <p class="sub">Criados e editados em Painel → Planos e pagamentos. Cada plano pago tem preço mensal, trimestral e anual, dias grátis e desconto na renovação automática. Preços de lançamento: Afiliado Pro R$ 59,90, R$ 159,90 e R$ 599; Loja Parceira R$ 39,90, R$ 107,90 e R$ 399. As 20 primeiras lojas ganham 1 mês grátis. A renovação automática usa o Mercado Pago, e cada cobrança é conferida na API. Com cartão salvo, é autorizada no próprio site e a primeira cobrança sai em cerca de 1 hora; sem cobrança aprovada em 3 dias, a assinatura é cancelada. As regras estão nos Termos, item 5-A. Em Meus planos, a pessoa troca de plano ou período, adiciona outro plano e desliga a renovação; na troca, o que falta usar vira dias a mais.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Plano</th><th>Para quem</th><th>Preço atual</th></tr></thead>
+        <tbody>
+          <tr><td>Caçador de Ofertas</td><td>Consumidor</td><td>Grátis, sem vencimento</td></tr>
+          <tr><td>Loja Parceira</td><td>Empresas e pessoas que vendem</td><td>R$ 59,90 / 30 dias</td></tr>
+          <tr><td>Afiliado Pro</td><td>Quem quer usar a ferramenta com os próprios links</td><td>R$ 89,90 / 30 dias</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>Cada plano define: preço, dias, tipos de acesso (Consumidor, Empresa, Ferramenta), limite de produtos, funções do perfil e o texto da página inicial.</li>
+        <li>A compra acontece em <span class="rota">/assinar</span>: dados, aceites e pagamento pelo Mercado Pago (Pix ou cartão, até 6 parcelas). Quem tem cartão salvo (Minha conta → Meus cartões) paga digitando só o código de segurança. Também há Pix pela sua chave, transferência e link de pagamento.</li>
+        <li><b>Direito de arrependimento:</b> em até 7 dias da compra, a pessoa desiste em Minha conta → Senha e conta → Desistir do plano. Pelo Mercado Pago, o reembolso é automático; nos outros meios, aparece "Reembolso a fazer" no painel.</li>
+        <li>Renovar soma os dias ao prazo que restava. Quando um plano pago vence, a conta volta para o plano grátis (se houver um do mesmo tipo) ou pede renovação.</li>
+        <li>Você pode trocar o plano de qualquer conta a qualquer momento em Painel → Usuários (com validade do plano, sem vencimento ou até uma data).</li>
+      </ul>
+    </section>
+
+    <section id="postagens">
+      <h2><span class="n">12</span>Postagens nas redes</h2>
+      <p class="sub">Como as ofertas saem do site para os grupos e redes sociais.</p>
+      <ol class="fluxo">
+        <li><b>Escolher</b><span>Na tela de ofertas, toque no ✓ dos produtos ou use "★ Melhor de cada categoria".</span></li>
+        <li><b>Revisar</b><span>Em <span class="rota">/postagens</span>, cada produto tem o texto pronto e editável, pelo modelo de mensagem escolhido, e mostra o tipo do produto.</span></li>
+        <li><b>Escolher os grupos</b><span>Com o WhatsApp marcado, aparecem os grupos com foto e nome. <b>Cada produto nos grupos do tipo e da loja dele</b> segue a marcação de cada grupo; <b>Todos nos grupos marcados</b> ignora essa regra. Cada produto mostra para onde vai.</span></li>
+        <li><b>Publicar</b><span><b>Postar automaticamente</b> agora, com intervalo entre os produtos, ou <b>Adicionar à fila agendada</b>. A fila guarda os grupos escolhidos.</span></li>
+      </ol>
+      <ul>
+        <li><b>Redes automáticas:</b> WhatsApp pela API própria, Telegram (bot), Facebook e Instagram (token da página) e X (4 chaves).</li>
+        <li><b>Agendamento:</b> em horários fixos ou no modo contínuo, com intervalo sorteado entre o início e o fim do dia. Primeiro a fila; se faltar, as melhores do momento, por nota de venda e comissão, sem descontos suspeitos.</li>
+        <li><b>Preço na hora:</b> Mercado Livre e Shopee são conferidos na API logo antes de postar pelo agendamento. Se o preço subiu mais de 10%, ficou com menos de 15% de desconto ou o produto saiu do ar, a oferta dá lugar à próxima. As outras lojas usam o preço visto pela mineração.</li>
+        <li><b>Repetição:</b> o mesmo produto, mesmo de outro vendedor, não volta em 7 dias, a não ser que caia pelo menos 10% sobre o menor preço postado, passadas 24 horas.</li>
+        <li><b>Nova tentativa:</b> um grupo que falha recebe mais 2 tentativas, depois de 5 e de 15 minutos. Sem confirmação do envio, não reenvia, para não repetir no grupo.</li>
+        <li><b>Avisos:</b> número fora do ar, rodada com falha e rodada sem ofertas geram aviso no sino e por e-mail, no máximo um a cada 6 horas para o mesmo problema.</li>
+        <li><b>Resultados:</b> em Painel → Membros dos grupos, com envios, cliques e falhas por grupo, horário, tipo, loja e oferta. Os cliques dependem do link próprio de cada grupo. Comissão por postagem ainda não existe.</li>
+        <li><b>Ofertas relâmpago:</b> vão para a frente da fila e saem na hora, com o cupom, se houver. Só com o agendamento ligado, entre os horários de início e fim, respeitando palavras, lojas e grupos. Limite de 10 por hora e 3 minutos entre elas. Não posta oferta a menos de 10 minutos do fim. O produto só repete se estiver 10% abaixo do menor preço postado na semana.</li>
+        <li><b>Palavras das ofertas automáticas:</b> no Agendamento, as palavras obrigatórias e as proibidas têm listas de sugestões para marcar e o botão Acrescentar mais palavras, que procura nos termos da mineração. As lojas também são marcadas por toque. A comparação procura o trecho dentro do nome do produto, então evite palavras curtas ou comuns.</li>
+        <li><b>Lista de cupons:</b> no Agendamento, poste na hora ou em horários fixos, nas redes marcadas. São 20 cupons por envio, um abaixo do outro, com onde usar. Cada envio continua de onde o anterior parou, e grupo de WhatsApp com lojas marcadas recebe só os cupons delas. No WhatsApp e no Facebook, "Ver mais" é um link; no Telegram, um botão. O Instagram leva uma imagem com os 10 primeiros e a lista na legenda (links na legenda não abrem). O X leva os que couberem em 280 caracteres.</li>
+        <li><b>Cupons do afiliado:</b> o "Ver mais" dele abre <span class="rota">/cupons?de=id</span>, uma página à parte, sem links para as ofertas do site. As ofertas abrem pelo link de afiliado dele; se faltar o link de uma loja, vão sem comissão.</li>
+        <li><b>Grupo de automação:</b> quem mandar um link num grupo de controle posta nos grupos de envio. Também há comandos como preview, converter, fila, cupom, status, pausar e ligar.</li>
+        <li><b>Alertas particulares:</b> quem pedir recebe no WhatsApp as ofertas dos termos escolhidos, das 8h às 22h, com aceite registrado.</li>
+        <li><b>Fotos:</b> as postagens usam a foto original do produto, sem marca d'água.</li>
+        <li>A equipe com a função <b>Postar anúncios</b> também posta, pelo mesmo caminho.</li>
+      </ul>
+    </section>
+
+    <section id="whatsapp">
+      <h2><span class="n">13</span>WhatsApp (API própria)</h2>
+      <p class="sub">A conexão do site com o WhatsApp, sem Z-API nem Evolution. Fica em Painel → Redes sociais → WhatsApp.</p>
+      <ol class="fluxo">
+        <li><b>Conectar</b><span>Clique em <b>Conectar</b> e leia o QR code no celular, em Dispositivos conectados. A sessão fica em <code>data/whatsapp-sessao</code> e volta sozinha quando o site reinicia.</span></li>
+        <li><b>Carregar os grupos</b><span>Aparecem só os grupos que o número criou e administra, com foto, nome e número de pessoas. A tela informa quantos ficaram de fora.</span></li>
+        <li><b>Marcar tipos e lojas</b><span>Em cada grupo: tipos de produto (Tecnologia, Casa, Automóveis, Moda, Beleza e saúde, Esporte, Bebês e brinquedos, Pets, Ferramentas e Alimentos) e lojas (todas as do site e as lojas parceiras, que aparecem sozinhas quando são cadastradas). O nome do grupo pode sugerir o tipo. Sem nada marcado, recebe tudo.</span></li>
+        <li><b>Salvar</b><span>Os grupos salvos recebem as postagens agendadas.</span></li>
+      </ol>
+      <h3>Outras funções do painel</h3>
+      <ul>
+        <li><b>Criar grupos em série:</b> de 5 a 10 grupos com o mesmo nome e número contínuo, um a cada 20 segundos. Para no primeiro erro.</li>
+        <li><b>Conversas:</b> foto, nome, busca e filtro de grupos e contatos. O texto das mensagens novas fica guardado por 30 dias; o histórico antigo não é copiado. Mensagens de grupos de outras pessoas não são guardadas.</li>
+        <li><b>Comportamento do número:</b> rejeitar chamadas com mensagem automática, marcar mensagens e status como vistos e aparecer sempre online.</li>
+        <li><b>Desconectar:</b> sai da conta neste aparelho e apaga do servidor a sessão, as fotos, os contatos e as mensagens desse número.</li>
+      </ul>
+      <h3>API para outros programas</h3>
+      <p>Gere a chave no painel e envie o cabeçalho <code>Authorization: Bearer SUA_CHAVE</code>. A chave só não conecta nem desconecta o número. A lista completa fica em <b>Endereços da API</b>, no painel.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Área</th><th>O que faz</th><th>Exemplo</th></tr></thead>
+        <tbody>
+          <tr><td>Enviar</td><td>Texto, foto, vídeo, documento, áudio, nota de vídeo, figurinha, localização, contato, enquete, reação e status</td><td><span class="rota">POST /api/wa/enviar/texto</span></td></tr>
+          <tr><td>Mensagens</td><td>Ler, buscar, marcar como lida, apagar, editar, baixar mídia e ver a entrega</td><td><span class="rota">GET /api/wa/mensagens</span></td></tr>
+          <tr><td>Contatos</td><td>Conferir números, bloquear, perfil e privacidade</td><td><span class="rota">POST /api/wa/numeros</span></td></tr>
+          <tr><td>Grupos</td><td>Criar, editar, participantes, permissões, convites e sair</td><td><span class="rota">POST /api/wa/grupos/em-serie</span></td></tr>
+          <tr><td>Postagens</td><td>Ofertas por tipo, postar, fila e resultados</td><td><span class="rota">POST /api/wa/postar</span></td></tr>
+          <tr><td>Business</td><td>Etiquetas, catálogo e coleções</td><td><span class="rota">GET /api/wa/catalogo</span></td></tr>
+        </tbody>
+      </table></div>
+      <p>O site também avisa outro programa (POST assinado) a cada mensagem nova, entrega, chamada, entrada ou saída de grupo e mudança na conexão.</p>
+      <div class="nota ouro"><b>Riscos</b><p>Esta conexão não é a API oficial do WhatsApp, e o número pode ser banido. Não há número reserva: se ele cair, os envios param até conectar outro. Use um número só para isso, mantenha o intervalo e poste apenas em grupos onde as pessoas entraram por vontade própria.</p><p>A pasta da sessão dá acesso à conta, e a chave da API age em nome do número. Nunca copie nem compartilhe. Se uma chave aparecer em algum lugar, troque-a no painel.</p></div>
+    </section>
+
+    <section id="perfis">
+      <h2><span class="n">14</span>Perfis, conquistas e comunidade</h2>
+      <p class="sub">A parte social do site.</p>
+      <ul>
+        <li>Todo mundo tem um perfil com foto, capa, título, cidade, resumo, cor, moldura, efeitos, links e vitrine de conquistas. O plano define quanto dá para personalizar. Em Editar perfil, uma prévia ao vivo aparece ao lado (no computador).</li>
+        <li><b>Conquistas</b> (bronze a diamante) dão XP e o XP define o nível: tempo de conta, idas às lojas, compras, ofertas postadas, cliques, vendas da loja e anúncios. No perfil, ficam num carrossel por categoria, com setas.</li>
+        <li><b>Molduras de temporada e de datas comemorativas de 2027</b> (1ª Temporada, Ano Novo, Carnaval, Dia do Consumidor, Páscoa, Dia da Terra, Dia das Mães, Halloween, Black Friday e Natal): quem entra no site durante o período ganha a moldura para sempre.</li>
+        <li><b>Comunidade:</b> quadro na tela de ofertas com todos os perfis. Pesquise com <code>#nome</code>, siga pessoas e lojas e veja Seguindo e Seguidores. Passar o mouse num perfil mostra a prévia dele, com moldura e efeitos.</li>
+        <li>Vendas e compras confirmadas por afiliados são registradas por você no perfil da pessoa (quadro Admin), porque as lojas não informam isso automaticamente.</li>
+      </ul>
+    </section>
+
+    <section id="cosmeticos">
+      <h2><span class="n">15</span>Cosméticos, moedas e missões</h2>
+      <p class="sub">Personalização do perfil paga com moedas do site (sem dinheiro real).</p>
+      <ul>
+        <li><b>Loja de cosméticos:</b> abre pelo botão no topo de Editar perfil (ou em <span class="rota">/cosmeticos</span>). Tem <b>16 molduras animadas</b> (de 250 a 2.000 moedas), <b>14 efeitos de perfil</b> (animação no fundo do topo do perfil) e <b>6 efeitos de nome</b>. Cada item aparece com a foto da própria pessoa.</li>
+        <li><b>Moedas:</b> saldo = XP das conquistas + moedas de missões e vídeos − o que foi gasto. Gastar não tira o XP nem o nível.</li>
+        <li><b>Missões:</b> 4 diárias, 4 semanais e 2 únicas (entrar no site, ir às lojas, mandar mensagem, assistir vídeo, seguir perfis, avaliar loja, completar o perfil). O site confere sozinho; a pessoa toca em resgatar.</li>
+        <li><b>Vídeos patrocinados:</b> você cadastra em Painel → Publicidade → Vídeos patrocinados (título, anunciante, link, tempo mínimo e moedas). Até 5 vídeos por dia por pessoa; o painel mostra quantas vezes cada um foi assistido até o fim.</li>
+        <li>O admin tem todas as molduras e efeitos. Com "reduzir movimento" ligado no aparelho, as animações ficam paradas.</li>
+      </ul>
+    </section>
+
+    <section id="mensagens">
+      <h2><span class="n">16</span>Mensagens, SAC e moderação</h2>
+      <p class="sub">Conversas entre pessoas, atendimento das lojas, o suporte do Ofertou! e o filtro de xingamentos.</p>
+      <ul>
+        <li><b>Botão Mensagens</b> no canto inferior direito de todas as páginas, com o número de não lidas.</li>
+        <li><b>Conversa pessoal:</b> a primeira mensagem chega como pedido; quem recebe aceita, recusa ou bloqueia.</li>
+        <li><b>Atendimento da loja:</b> entra direto, sem aceite. Cada conversa é um ticket CV-000123.</li>
+        <li><b>Filtro de xingamentos:</b> palavrões viram asteriscos antes de chegar ao destinatário. O texto original fica só para a moderação, que pode advertir, bloquear as mensagens por X dias, suspender ou banir.</li>
+      </ul>
+      <h3>SAC (Suporte Ofertou!)</h3>
+      <ol class="fluxo">
+        <li><b>O cliente abre um chamado</b><span>Em Mensagens → Suporte Ofertou!: escolhe o assunto, escreve e vê a posição na fila.</span></li>
+        <li><b>Um atendente assume</b><span>Na Área de trabalho (<span class="rota">/trabalho</span>) ou em <span class="rota">/sac</span>, abas Na fila, Meus, Outros e Resolvidos. Só um atendente fica com cada chamado.</span></li>
+        <li><b>Resolve e o cliente avalia</b><span>O cliente recebe aviso no sino e por e-mail e dá de 1 a 5 estrelas.</span></li>
+      </ol>
+    </section>
+
+    <section id="publicidade">
+      <h2><span class="n">17</span>Publicidade</h2>
+      <p class="sub">Espaços de banner para empresas, vídeos patrocinados e anúncios do Google.</p>
+      <ul>
+        <li>Quatro espaços de banner: topo da página inicial, meio da lista de ofertas, acima dos filtros (computador) e fim das páginas de loja e anúncio.</li>
+        <li>Espaço vazio mostra "Anuncie sua marca aqui", que abre o seu WhatsApp. Pedidos de empresas chegam em Painel → Publicidade.</li>
+        <li>Campanhas têm período, imagem (e vídeo curto opcional), e o painel mostra visualizações, cliques e taxa de clique. Todo banner leva o selo "Patrocinado".</li>
+        <li><b>Vídeos patrocinados</b> (Painel → Publicidade): o anunciante paga para as pessoas assistirem, e quem assiste ganha moedas.</li>
+        <li><b>Avisos na entrada</b> (Painel → Avisos na entrada): janelas com texto, imagem, cupom e botão que aparecem para quem abre a tela de ofertas. Você escolhe o tipo (cupom, novidade, produto ou aviso), quem vê, quantas vezes (uma vez, uma por dia ou toda visita) e o período, e vê quantos viram e clicaram.</li>
+        <li>Espaços sem campanha podem mostrar anúncios do <b>Google AdSense</b>, que exige o site no ar com domínio e https e só carrega com o aceite de cookies.</li>
+      </ul>
+    </section>
+
+    <section id="admin">
+      <h2><span class="n">18</span>Painel do administrador</h2>
+      <p class="sub">Em <span class="rota">/admin</span>, com menu lateral por assunto. No celular, o botão com o nome da tela abre o menu inteiro.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Grupo</th><th>Páginas</th></tr></thead>
+        <tbody>
+          <tr><td>Início</td><td><b>Painel:</b> situação do site, números, "Precisa da sua atenção" com ação rápida, saldo, gráficos e mineração por loja.</td></tr>
+          <tr><td>Conteúdo</td><td><b>Ofertas</b>, <b>Mineração</b> (cupons e comissão extra), <b>Redes sociais</b> (WhatsApp, agendamento, alertas, grupo de automação), <b>Membros dos grupos</b> (com o resultado das postagens) e <b>Avisos na entrada</b>.</td></tr>
+          <tr><td>Pessoas</td><td><b>Usuários</b> (aprovar, suspender, banir, trocar plano, ficha com os aceites), <b>Lojas e pedidos</b>, <b>Clientes</b> e <b>Acessos suspeitos</b>.</td></tr>
+          <tr><td>Atendimento</td><td><b>SAC</b>, <b>Moderação</b> e <b>Equipe</b>, com a aba Cargos e permissões.</td></tr>
+          <tr><td>Dinheiro</td><td><b>Planos</b>, <b>Ganhos</b> (Shopee e Awin sincronizam a cada 6 horas; Mercado Livre e Magalu são lidos pela extensão do Chrome com o painel aberto, com saldo e vendas; Amazon e AliExpress por planilha), <b>Links de afiliado</b> e <b>Publicidade</b>.</td></tr>
+          <tr><td>Configurações</td><td><b>Site</b> (endereço, responsável legal, grupos) e <b>Senha e backup</b> (senha, login em duas etapas e backups).</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li><b>Modo de visualização:</b> na <span class="rota">/central</span>, Afiliado e Loja parceira abrem com dados de exemplo, sem login e sem salvar nada.</li>
+        <li><b>Busca do topo:</b> pesquise uma oferta ou cole o link de um produto.</li>
+        <li><b>Conversas apagadas:</b> quem apaga uma conversa pelo menu ⋯ deixa de vê-la, mas o histórico continua em Painel → Lojas e pedidos, marcado com quem apagou. O botão <b>Apagar histórico</b> remove de vez as mensagens e as ocorrências de moderação daquela conversa, também para as pessoas dela. Bloqueios e pedidos continuam valendo.</li>
+        <li><b>Capi:</b> em Painel → SAC dá para testar as respostas da assistente virtual. Ela responde só com o que está no <span class="rota">/ajuda</span>, então manter o guia atualizado melhora as respostas.</li>
+      </ul>
+    </section>
+
+    <section id="equipe">
+      <h2><span class="n">19</span>Equipe (staff)</h2>
+      <p class="sub">Pessoas que trabalham para o Ofertou!, organizadas por cargo.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Cargo</th><th>O que pode fazer (padrão)</th></tr></thead>
+        <tbody>
+          <tr><td>Proprietário</td><td>Tudo. É você (login "admin"); pode dar o cargo a alguém, que ganha todas as funções da Área de trabalho, mas nunca o painel admin.</td></tr>
+          <tr><td>Gerente</td><td>SAC, Moderação do chat, Suspender e banir, Postar anúncios e Gerenciar a equipe.</td></tr>
+          <tr><td>Admin</td><td>Tudo menos gerenciar a equipe.</td></tr>
+          <tr><td>Moderador</td><td>Moderação do chat.</td></tr>
+          <tr><td>Suporte</td><td>SAC.</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>Mude o que cada cargo pode em Painel → Equipe (staff) → <b>Cargos e permissões</b>. Só o Proprietário mexe nessa tabela.</li>
+        <li>A pessoa entra em <span class="rota">/conta</span> com o próprio login e usa a <b>Área de trabalho</b> (<span class="rota">/trabalho</span>), que mostra só o que o cargo permite.</li>
+        <li>Quem gerencia a equipe só cadastra e muda cargos abaixo do seu. Ninguém muda o próprio cargo. Tudo fica no histórico.</li>
+        <li>Na Área de trabalho há o <b>Guia da equipe</b>, com os tutoriais de SAC, moderação, postagens e conduta (sem nada da configuração do site).</li>
+      </ul>
+    </section>
+
+    <section id="seguranca">
+      <h2><span class="n">20</span>Segurança e LGPD</h2>
+      <p class="sub">Como o site protege as contas e os dados pessoais.</p>
+      <h3>Senhas</h3>
+      <ul>
+        <li>Toda senha nova precisa ter pelo menos 8 caracteres, letra maiúscula, letra minúscula, número e símbolo.</li>
+        <li>São recusadas senhas muito comuns, com o mesmo caractere 4 vezes seguidas ou com o e-mail ou o nome da pessoa.</li>
+        <li>Enquanto a pessoa digita, a lista de regras aparece embaixo dos campos com ✓ no que já foi cumprido. O servidor confere de novo.</li>
+        <li>As senhas são guardadas com criptografia (scrypt), nunca em texto. No painel do administrador, 5 senhas erradas bloqueiam o login por 15 minutos.</li>
+        <li><b>Login em duas etapas</b> do administrador: app autenticador, QR code e 8 códigos de recuperação. Configure em Painel → Senha e backup.</li>
+        <li><b>Backup automático:</b> uma cópia compactada do banco por dia, de madrugada. Guarda os últimos dias e uma por semana das últimas 4 semanas. Escolha uma pasta sincronizada com a nuvem para não depender só do servidor.</li>
+      </ul>
+      <h3>LGPD</h3>
+      <ul>
+        <li>Caixas obrigatórias no cadastro e na compra: Privacidade (LGPD), Termos de Uso e, para lojistas e afiliados, os Termos do Parceiro. Nunca vêm marcadas.</li>
+        <li>Cada aceite é registrado com versão dos documentos, data, hora, IP e navegador, e aparece na ficha do usuário. A versão atual fica em <code>src/consentimento.js</code>.</li>
+        <li>Documento completo em <span class="rota">/privacidade</span>. Preencha os dados do responsável em Painel → Site.</li>
+        <li>CPF e CNPJ são validados e só podem ter uma conta cada. Só dados públicos de empresas (CNPJ) são consultados.</li>
+        <li>Os cartões salvos ficam no Mercado Pago; o site não guarda número, validade nem código de segurança.</li>
+        <li><b>WhatsApp:</b> texto das mensagens novas por 30 dias, por número conectado. Membros dos grupos só em contagens. Cliques sem identificar quem clicou. Vale citar a guarda das conversas de afiliados na Política de Privacidade.</li>
+      </ul>
+    </section>
+
+    <section id="lei">
+      <h2><span class="n">21</span>Adequação à lei brasileira</h2>
+      <p class="sub">O que o site já faz sozinho.</p>
+      <ul>
+        <li><b>Identificação do responsável (Decreto 7.962/2013):</b> nome, CPF/CNPJ, endereço, e-mail e o link dos Termos no rodapé de todas as páginas e e-mails. O endereço precisa ser completo.</li>
+        <li><b>Arrependimento (CDC, art. 49):</b> 7 dias para desistir dos planos, com reembolso.</li>
+        <li><b>Registros de acesso (Marco Civil, art. 15):</b> IP, data e hora guardados por 6 meses e apagados depois. Só entregue com ordem judicial.</li>
+        <li><b>Acessos suspeitos:</b> os mesmos registros, com a cidade aproximada de cada IP (base DB-IP no próprio servidor), mostram contas usadas em lugares distantes em pouco tempo. Base atualizada 1x por mês com <code>npm run geoip</code>.</li>
+        <li><b>Cookies (LGPD):</b> Google Analytics e AdSense só carregam depois de "Aceitar todos". "Preferências de cookies" fica no rodapé.</li>
+        <li><b>Moderação transparente:</b> filtro de xingamentos com punições graduais e avaliações de lojas ocultadas só por abuso, com o autor avisado.</li>
+        <li><b>Termos do Parceiro:</b> responsabilidade exclusiva, direito de regresso e proibição de revenda para lojistas e afiliados.</li>
+        <li><b>Acessibilidade:</b> link "Pular para o conteúdo", idioma pt-BR e destaque de foco para teclado.</li>
+      </ul>
+    </section>
+
+    <section id="app">
+      <h2><span class="n">22</span>App de celular</h2>
+      <p class="sub">Android (Play Store) e iPhone (App Store).</p>
+      <ul>
+        <li>O app (feito com Capacitor, na pasta <code>mobile/</code>) abre o site <span class="rota">https://tanoofertou.com.br</span> dentro dele. Links internos ficam no app; sites de fora abrem no navegador.</li>
+        <li>Planos dentro do app são vendidos pelas lojas de apps (compra no app, via RevenueCat).</li>
+        <li>Sem passar pelas lojas de apps, o site já pode ser instalado pelo botão <b>Baixar app</b> (Android) e pelo Safari (iPhone).</li>
+        <li>Para publicar nas lojas faltam as contas de desenvolvedor (Google Play e Apple), as chaves do RevenueCat e um Mac para gerar a versão de iPhone.</li>
+      </ul>
+    </section>
+
+    <section id="tecnica">
+      <h2><span class="n">23</span>Parte técnica</h2>
+      <p class="sub">Para quem for cuidar do servidor.</p>
+      <ul>
+        <li>Feito em <b>Node.js 24</b> com Express e banco <b>SQLite</b>, tudo em um único programa.</li>
+        <li>Iniciar: <code>npm start</code> (ou <code>start.bat</code>). O site abre em <span class="rota">http://localhost:3000</span>.</li>
+        <li>Dados: <code>data/ofertas.db</code> (banco), <code>data/uploads</code> (imagens enviadas), <code>data/cache-img</code> (fotos guardadas), <code>data/whatsapp-sessao*</code> (conexões do WhatsApp) e <code>data/backups</code>.</li>
+        <li><b>Atualizar a VPS:</b> rode <code>atualizar-vps.bat</code>. Ele baixa a versão nova do GitHub, para o site, faz backup do banco e copia o código sem tocar em <code>data\</code>, <code>node_modules\</code>, <code>.env</code> e <code>senha.txt</code>.</li>
+        <li><b>Testes:</b> <code>npm test</code>.</li>
+        <li>Desenhos das molduras e efeitos: <code>node video/molduras/gerar.js</code>, <code>animadas.js</code> e <code>efeitos.js</code>.</li>
+        <li>Serviços externos usados: Mercado Pago, ViaCEP e BrasilAPI (CEP e CNPJ), APIs das lojas e das redes sociais, WhatsApp (biblioteca Baileys, conexão direta) e o Gmail para enviar e-mails.</li>
+        <li>Instalação do zero: <code>PASSO_A_PASSO_VPS.md</code> e <code>DOMINIO_E_EMAIL.md</code>.</li>
+        <li>O código fica no GitHub (repositório Ofertas-do-GP). Senhas, chaves e o banco não vão para o repositório.</li>
+      </ul>
+    </section>
+
+    <section id="situacao">
+      <h2><span class="n">24</span>Situação atual</h2>
+      <p class="sub">Levantamento de 06/11/2026, feito no site no ar e numa cópia do banco. A cópia não traz as chaves secretas, então os itens "A conferir" precisam da sua verificação no painel.</p>
+      <div class="status">
+        <div class="item"><span class="chip ok">No ar</span><p><b>Site em tanoofertou.com.br</b>Domínio com https respondendo, com mais de 120 mil ofertas na cópia do banco.</p></div>
+        <div class="item"><span class="chip ok">No ar</span><p><b>WhatsApp pela API própria</b>Número conectado, confirmado pela API em 06/11. Faltam testes completos das funções novas com o número real.</p></div>
+        <div class="item"><span class="chip ok">Pronto</span><p><b>Mineração de 5 lojas</b>Amazon, Shopee, Magalu, AliExpress e KaBuM! aparecem funcionando na cópia.</p></div>
+        <div class="item"><span class="chip bloq">Bloqueio</span><p><b>Mercado Livre</b>Aparece como bloqueado na mineração da cópia. Confira em Painel → Mineração.</p></div>
+        <div class="item"><span class="chip falta">Falta</span><p><b>Links de afiliado da AliExpress e da KaBuM!</b>O painel avisou que 31.561 e 1.887 ofertas, respectivamente, saíam sem a sua comissão.</p></div>
+        <div class="item"><span class="chip falta">Falta</span><p><b>Pasta externa de backup</b>O painel avisou que o backup fica só neste servidor. Escolha uma pasta sincronizada com a nuvem.</p></div>
+        <div class="item"><span class="chip falta">A conferir</span><p><b>Mercado Pago, das assinaturas e das lojas</b>Confira o Access Token e o Client ID e Secret em Painel → Planos e Lojas e pedidos.</p></div>
+        <div class="item"><span class="chip falta">A conferir</span><p><b>Envio de e-mails</b>Depende da senha de app do Gmail. Os avisos de falha por e-mail também dependem dela.</p></div>
+        <div class="item"><span class="chip falta">A conferir</span><p><b>Última atualização da VPS</b>As mudanças de 06/11 só entram no ar depois de rodar <code>atualizar-vps.bat</code>.</p></div>
+        <div class="item"><span class="chip falta">Falta</span><p><b>Revisão jurídica</b>Pedir a um advogado para revisar os Termos do Parceiro e a Política. A versão de 06/11 já informa que conversas apagadas continuam no histórico e como as conversas do WhatsApp conectado são guardadas. A base legal desse item merece atenção especial.</p></div>
+        <div class="item"><span class="chip falta">Falta</span><p><b>App nas lojas</b>Contas de desenvolvedor, RevenueCat e Mac (para iPhone).</p></div>
+      </div>
+      <div class="rodape">Manual para o administrador, montado a partir do código do site e do GUIA_DE_USO.md em 06/11/2026. O guia para clientes, lojas e afiliados fica em /ajuda, e a equipe tem o próprio guia na Área de trabalho.</div>
+    </section>
+  </main>
+</div>
+<script>
+(() => {
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const obs = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) links.forEach(a => a.classList.toggle('atual', a.getAttribute('href') === '#' + e.target.id));
+  }), { rootMargin: '-30% 0px -60% 0px' });
+  links.forEach(a => { const s = document.querySelector(a.getAttribute('href')); if (s) obs.observe(s); });
+})();
+</script>
