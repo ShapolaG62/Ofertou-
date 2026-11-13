@@ -67,20 +67,37 @@ function parse(lista) {
   return deals;
 }
 
+// Até 3 páginas de 60 por termo. Só a 1ª deixava muita oferta de fora (2026-11-13: "monitor" tinha 49 com desconto na
+// 1ª página e mais 81 nas 2ª e 3ª; "cadeira gamer", 52 e mais 54). Segue para a próxima só se a página veio cheia e
+// com bastante desconto (em "fone bluetooth" a 2ª já tinha só 8): termo fraco continua custando um pedido só.
+const PAGINAS = 3, MIN_PARA_SEGUIR = 10;
+let PAUSA_PAGINA = 1200; // entre as páginas do mesmo termo (os testes zeram)
 async function search(query) {
-  const res = await http.get(API, {
-    params: { query: query.trim(), page_number: 1, page_size: 60, facet_filters: '', sort: 'most_searched', is_prime: false,
-      payload_data: 'products_category_filters', include: 'gift' },
-    headers: { Accept: 'application/json', Origin: SITE, Referer: `${SITE}/` },
-    validateStatus: () => true,
-  });
-  // 404 "CATALOG_NOT_MATCH" = a KaBuM! não tem esse produto (não é bloqueio).
-  if (res.status === 404 && /CATALOG_NOT_MATCH/.test(JSON.stringify(res.data || ''))) return { status: 'ok', deals: [] };
-  if (res.status === 403 || res.status === 429) {
-    return { status: 'blocked', message: `A KaBuM! recusou a busca (HTTP ${res.status}): possível bloqueio do IP.`, deals: [] };
+  const deals = [];
+  const vistos = new Set();
+  for (let pagina = 1; pagina <= PAGINAS; pagina++) {
+    const res = await http.get(API, {
+      params: { query: query.trim(), page_number: pagina, page_size: 60, facet_filters: '', sort: 'most_searched', is_prime: false,
+        payload_data: 'products_category_filters', include: 'gift' },
+      headers: { Accept: 'application/json', Origin: SITE, Referer: `${SITE}/` },
+      validateStatus: () => true,
+    });
+    // 404 "CATALOG_NOT_MATCH" = a KaBuM! não tem esse produto (não é bloqueio).
+    if (res.status === 404 && /CATALOG_NOT_MATCH/.test(JSON.stringify(res.data || ''))) break;
+    if (res.status === 403 || res.status === 429) {
+      if (deals.length) break; // já tem o que veio antes: fica com isso e não marca a loja como bloqueada por uma página a mais
+      return { status: 'blocked', message: `A KaBuM! recusou a busca (HTTP ${res.status}): possível bloqueio do IP.`, deals: [] };
+    }
+    if (res.status >= 400 || !Array.isArray(res.data?.data)) {
+      if (deals.length) break;
+      return { status: 'error', message: `HTTP ${res.status}`, deals: [] };
+    }
+    const daPagina = parse(res.data.data).filter(d => !vistos.has(d.store_product_id));
+    for (const d of daPagina) { vistos.add(d.store_product_id); deals.push(d); }
+    if (res.data.data.length < 60 || daPagina.length < MIN_PARA_SEGUIR) break;
+    if (pagina < PAGINAS) await new Promise(r => setTimeout(r, PAUSA_PAGINA));
   }
-  if (res.status >= 400 || !Array.isArray(res.data?.data)) return { status: 'error', message: `HTTP ${res.status}`, deals: [] };
-  return { status: 'ok', deals: parse(res.data.data) };
+  return { status: 'ok', deals };
 }
 
 // Um produto pelo código (a mesma API que o site da KaBuM! usa): usado pela repostagem quando a mensagem não traz os preços.
@@ -95,6 +112,7 @@ async function lerProduto(id) {
 }
 
 module.exports = {
+  _paraTestes: ({ pausa } = {}) => { if (pausa !== undefined) PAUSA_PAGINA = pausa; },
   lerProduto,
   parse,
   relampagoDe,
