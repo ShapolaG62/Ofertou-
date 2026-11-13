@@ -34,13 +34,27 @@ function priorizar(query) {
   settings.set(PRIORIDADE, JSON.stringify([q, ...lista].slice(0, 30)));
 }
 
-// Para a extensão: os próximos termos (primeiro os pedidos agora, depois a lista de termos em rodízio)
+// Termos entregues à extensão que ainda não voltaram: { q, em (ms), vezes }. Termo que não volta em 3 minutos (o Chrome
+// desligou a extensão no meio, a busca falhou, o computador dormiu) é entregue de novo, até 3 vezes no total.
+const ENTREGUES = 'ml_chrome_entregues';
+const VOLTA_MS = 3 * 60000, MAX_VEZES = 3;
+
+// Para a extensão: os próximos termos (primeiro os que não voltaram, depois os pedidos agora, depois o rodízio)
 function proximos() {
   if (!ligada()) return [];
   const n = Math.min(Math.max(parseInt(settings.get('ml_chrome_termos_por_minuto') ?? POR_MINUTO_PADRAO, 10) || 0, 0), 10);
+  const agoraMs = Date.now();
+  const entregues = ler(ENTREGUES, []).filter(e => e && e.q && e.vezes <= MAX_VEZES && agoraMs - e.em < 60 * 60000);
+  const escolhidos = [];
+  const vezes = new Map();
+  for (const e of entregues) {
+    if (escolhidos.length >= n) break;
+    if (agoraMs - e.em >= VOLTA_MS && e.vezes < MAX_VEZES) { escolhidos.push(e.q); vezes.set(e.q, e.vezes + 1); }
+  }
   const fila = ler(PRIORIDADE, []);
-  const escolhidos = fila.slice(0, n);
-  if (fila.length) settings.set(PRIORIDADE, JSON.stringify(fila.slice(n)));
+  const daFila = fila.filter(q => !escolhidos.includes(q)).slice(0, n - escolhidos.length);
+  escolhidos.push(...daFila);
+  if (daFila.length) settings.set(PRIORIDADE, JSON.stringify(fila.filter(q => !daFila.includes(q))));
   const termos = settings.getSearchTerms();
   if (escolhidos.length < n && termos.length) {
     const st = ler(ESTADO, {});
@@ -52,7 +66,17 @@ function proximos() {
     }
     settings.set(ESTADO, JSON.stringify({ ...st, cursor }));
   }
+  // Anota o que saiu agora (os que não voltaram a tempo e já passaram do limite de vezes são esquecidos)
+  const marcados = entregues.filter(e => !escolhidos.includes(e.q) && e.vezes < MAX_VEZES);
+  for (const q of escolhidos) marcados.push({ q, em: agoraMs, vezes: vezes.get(q) || 1 });
+  settings.set(ENTREGUES, JSON.stringify(marcados.slice(-200)));
   return escolhidos.map(query => ({ query, url: urlDaBusca(query) }));
+}
+// O termo voltou (com a página ou com erro): sai da lista de entregues
+function devolvido(q) {
+  const lista = ler(ENTREGUES, []);
+  const resto = lista.filter(e => e?.q !== q);
+  if (resto.length !== lista.length) settings.set(ENTREGUES, JSON.stringify(resto));
 }
 
 // Da extensão: a página de busca de um termo (ou o erro dela)
@@ -64,6 +88,7 @@ function receber({ query, html, erro } = {}) {
     settings.set(ESTADO, JSON.stringify({ ...st, erro: String(erro || 'a página veio vazia').slice(0, 200), erro_em: agora() }));
     return { encontradas: 0, gravadas: 0 };
   }
+  devolvido(q); // voltou com a página (com erro, fica para ser entregue de novo daqui a 3 minutos)
   const store = loja();
   const s = settings.getAll();
   const cat = (settings.getSearchTerms().find(t => t.query === q) || {}).cat || null;

@@ -194,6 +194,9 @@ function soOsProdutos(html) {
 async function minerarBuscas(site, cab) {
   if (minerando) return;
   minerando = true;
+  // O Chrome desliga esta parte da extensão depois de ~30 s sem chamada de extensão (as pausas entre as buscas não
+  // contam): a 4ª busca de cada lote se perdia. Uma chamada leve a cada 15 s mantém tudo ligado até o lote acabar.
+  const acordada = setInterval(() => { chrome.runtime.getPlatformInfo().catch(() => {}); }, 15000);
   try {
     const r = await fetch(`${site}/api/extensao/ml-buscas`, { headers: cab, cache: 'no-store' });
     if (!r.ok) return;
@@ -208,7 +211,7 @@ async function minerarBuscas(site, cab) {
       if (corpo.erro) break; // verificação ou erro do Mercado Livre: tenta de novo no próximo minuto
       await espera(5000);
     }
-  } finally { minerando = false; }
+  } finally { minerando = false; clearInterval(acordada); }
 }
 
 const ligarLeitor = () => chrome.alarms.create(ALARME_LEITOR, { periodInMinutes: 1 });

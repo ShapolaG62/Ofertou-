@@ -113,3 +113,20 @@ test('verificação do Mercado Livre ou página sem produtos aparecem como probl
   mlChrome.receber({ query: 'sandalia', html: paginaBusca() });
   assert.equal(mlChrome.estado().erro, null, 'a próxima busca boa limpa o aviso');
 });
+
+test('termo entregue que não volta em 3 minutos é entregue de novo (até 3 vezes); o que voltou não se repete', () => {
+  settings.set('search_terms', 'mouse\nmouse gamer\nteclado\nheadset\nwebcam\nmicrofone');
+  settings.set('ml_chrome_termos_por_minuto', '2');
+  settings.set('ml_chrome_estado', '{}');
+  settings.set('ml_chrome_entregues', '[]');
+  settings.set('ml_chrome_prioridade', '[]');
+  const voltar = min => settings.set('ml_chrome_entregues', JSON.stringify(JSON.parse(settings.get('ml_chrome_entregues')).map(e => ({ ...e, em: e.em - min * 60000 }))));
+  assert.deepEqual(mlChrome.proximos().map(b => b.query), ['mouse', 'mouse gamer']);
+  mlChrome.receber({ query: 'mouse', html: paginaBusca() });           // só "mouse" voltou
+  assert.deepEqual(mlChrome.proximos().map(b => b.query), ['teclado', 'headset'], 'antes de 3 minutos, segue o rodízio');
+  mlChrome.receber({ query: 'teclado', erro: 'Entre no portal neste Chrome (ele pediu login ou verificação) e tente de novo.' });
+  voltar(4);
+  assert.deepEqual(mlChrome.proximos().map(b => b.query), ['mouse gamer', 'teclado'], 'o que não voltou (ou voltou com erro) vem primeiro');
+  for (let i = 0; i < 3; i++) { voltar(4); mlChrome.proximos(); }
+  assert.ok(!JSON.parse(settings.get('ml_chrome_entregues')).some(e => e.q === 'mouse gamer' && e.vezes > 3), 'desiste depois de 3 vezes');
+});
