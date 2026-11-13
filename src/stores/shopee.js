@@ -79,16 +79,21 @@ async function search(query, s) {
       deals.push(oferta);
     }
     if (l.page === 1 && !d.productOfferV2?.pageInfo?.hasNextPage) semPagina2 = true;
+    await sleep(ESPERA_BASE / 2); // um respiro entre as listas: pedidos em sequência rápida dão mais "System Error"
   }
   return { status: 'ok', deals, message: erro ? `via API de afiliados (aviso: ${erro})` : 'via API de afiliados' };
 }
 
-// Chamada assinada à API GraphQL do Shopee Afiliados. O "System Error" [10000] é passageiro (o mesmo pedido
-// costuma dar certo logo depois): tenta mais 2 vezes antes de desistir, senão o termo inteiro se perdia.
+// Chamada assinada à API GraphQL do Shopee Afiliados. O "System Error" [10000] é passageiro, mas frequente: em
+// 2026-11-13 metade dos pedidos dava esse erro, e com 3 tentativas seguidas (1,5 s e 3 s) 3 de 8 termos se perdiam
+// (a rodada terminava com "erro" e ~25 produtos por termo). Com 6 tentativas e espera crescente (2, 4, 8, 16, 30 s),
+// 7 de 8 passaram. Os testes zeram a espera.
+let ESPERA_BASE = 2000;
+const TENTATIVAS = 6;
 async function gql(query, s, tentativa = 0) {
   try { return await gqlUmaVez(query, s); } catch (err) {
-    if (tentativa >= 2 || !/\[10000\]|System Error/i.test(err.message)) throw err;
-    await sleep(1500 * (tentativa + 1));
+    if (tentativa >= TENTATIVAS - 1 || !/\[10000\]|System Error/i.test(err.message)) throw err;
+    await sleep(Math.min(30000, ESPERA_BASE * 2 ** tentativa));
     return gql(query, s, tentativa + 1);
   }
 }
@@ -115,6 +120,7 @@ async function gerarLink(url, s) {
 }
 
 module.exports = {
+  _paraTestes: ({ espera } = {}) => { if (espera !== undefined) ESPERA_BASE = espera; },
   porLink,
   gerarLink,
   gql,
