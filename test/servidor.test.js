@@ -162,3 +162,12 @@ test('extensão do Chrome: busca do Mercado Livre pela chave, com página grande
   const lojas = await (await pede('/api/admin/stores', { headers: { Cookie: c } })).json();
   assert.equal(lojas.ml_chrome.gravadas, 1);
 });
+
+test('página do grupo: sem lista de grupos, leva ao grupo principal (não volta para o início)', async () => {
+  const pagina = await pede('/grupo');
+  assert.equal(pagina.status, 200, 'antes, /grupo voltava para a página inicial');
+  assert.match(await pagina.text(), /href="\/grupo\/entrar"/);
+  const entrar = await pede('/grupo/entrar');
+  assert.equal(entrar.status, 302);
+  assert.match(entrar.headers.get('location'), /^https:\/\/chat\.whatsapp\.com\//);
+});

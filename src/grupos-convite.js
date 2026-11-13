@@ -9,10 +9,18 @@ const CONTAGEM = 'grupos_convite_entradas'; // { link: entradas } (chave interna
 const textoDe = cid => (cid
   ? db.get(`SELECT value FROM cliente_config WHERE cliente_id = ? AND key = 'grupos_convite'`, cid)?.value
   : settings.get('grupos_convite'));
+const valido = link => /^https:\/\/(chat\.whatsapp\.com|t\.me|whatsapp\.com\/channel)\//i.test(String(link || ''));
 function lista(cid = null) {
-  return String(textoDe(cid) || '').split(/\r?\n/).map(l => l.split('|').map(x => x.trim()))
+  const grupos = String(textoDe(cid) || '').split(/\r?\n/).map(l => l.split('|').map(x => x.trim()))
     .map(([nome, link, limite]) => ({ nome: nome || 'Grupo', link, limite: Math.max(0, parseInt(limite, 10) || 0) }))
-    .filter(g => /^https:\/\/(chat\.whatsapp\.com|t\.me|whatsapp\.com\/channel)\//i.test(g.link || ''));
+    .filter(g => valido(g.link));
+  // Sem lista: o site usa o grupo principal (o mesmo dos botões "Grupo de ofertas"). Antes, /grupo voltava para a
+  // página inicial e quem clicava no link divulgado (bio, anúncio) nunca chegava ao WhatsApp.
+  if (!grupos.length && !cid) {
+    const principal = String(settings.get('whatsapp_link') || '').trim();
+    if (valido(principal)) return [{ nome: 'Grupo de ofertas', link: principal, limite: 0, principal: true }];
+  }
+  return grupos;
 }
 function contagem(cid = null) {
   const v = cid ? db.get('SELECT value FROM cliente_config WHERE cliente_id = ? AND key = ?', cid, CONTAGEM)?.value : settings.get(CONTAGEM);

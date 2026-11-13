@@ -83,7 +83,8 @@ test('site do grupo: endereço único, rotação por limite e contagem separada'
   assert.equal(gc.proximo(A).nome, 'G2');
   assert.equal(gc.proximo(A).nome, 'G2');
   assert.deepEqual(gc.resumo(A).map(g => [g.entradas, g.lotado]), [[1, true], [2, false]]);
-  assert.equal(gc.lista(null).length, 0, 'não mexe na lista do site');
+  assert.ok(!gc.lista(null).some(g => /aaa|bbb/.test(g.link)), 'não mexe na lista do site');
+  assert.ok(gc.lista(null).every(g => g.principal), 'site sem lista: só o grupo principal');
   gc.zerar(A);
   assert.equal(gc.resumo(A)[0].entradas, 0);
   db.run(`UPDATE clientes SET status = 'bloqueado' WHERE id = ?`, A);
