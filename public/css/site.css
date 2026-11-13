@@ -3687,3 +3687,14 @@ body .tabs-line:not(.cli-nav) button[aria-selected="true"] { background: var(--a
 /* Página de venda: chamada para afiliados logo no topo */
 .lp-afiliado { margin: 12px 0 0; font-size: 14.5px; color: var(--ink-2); }
 .lp-afiliado a { font-weight: 700; color: var(--brand); }
+
+/* Fila e histórico de postagens do cliente: rolagem própria com cabeçalho fixo, miniatura e nome clicável */
+.cli-table.rolavel { max-height: 440px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 10px; }
+.cli-table.rolavel thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+.post-prod { display: flex; gap: 10px; align-items: center; min-width: 200px; }
+.post-prod > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.post-foto { width: 48px; height: 48px; flex: none; border-radius: 8px; object-fit: contain; background: #fff; border: 1px solid var(--line); }
+.post-nome { color: var(--ink); font-weight: 600; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+a.post-nome:hover { text-decoration: underline; }
+.post-loja { font-size: 12px; color: var(--ink-3); }
+@media (max-width: 640px) { .post-foto { width: 40px; height: 40px; } }

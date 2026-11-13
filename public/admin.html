@@ -156,6 +156,13 @@
   /* Tabelas de cupons: rolagem própria com o cabeçalho fixo (a lista passa de centenas de linhas) */
   .tabela-rolavel { max-height: 440px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: 10px; }
   .tabela-rolavel thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+  /* Fila e histórico de postagens: miniatura + nome clicável + link da loja */
+  .post-prod { display: flex; gap: 10px; align-items: center; min-width: 220px; }
+  .post-foto { width: 48px; height: 48px; flex: none; border-radius: 8px; object-fit: contain; background: #fff; border: 1px solid var(--border); }
+  a.offer-title { color: var(--text); text-decoration: none; font-weight: 600; }
+  a.offer-title:hover { text-decoration: underline; }
+  .post-loja { font-size: 12px; color: var(--muted); }
+  @media (max-width: 640px) { .post-foto { width: 40px; height: 40px; } }
   .gn-sync-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
   .gn-sync-item { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
   .gn-sync-item b { display: block; font-size: 14px; }
@@ -1845,7 +1852,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
           </div>
           <p class="hint" id="agenda-estado"></p>
           <h3>Fila <button class="btn small danger" type="button" id="fila-limpar" style="margin-left:8px">Limpar fila</button></h3>
-          <div class="table-wrap">
+          <div class="table-wrap tabela-rolavel">
             <table>
               <thead><tr><th>Produto</th><th>Situação</th><th>Adicionada</th><th>Resultado</th><th></th></tr></thead>
               <tbody id="fila-body"></tbody>
@@ -1911,7 +1918,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
       <div class="panel">
         <h2>Histórico de postagens</h2>
         <p class="hint">As últimas 100 publicações automáticas, com quem publicou e o resultado.</p>
-        <div class="table-wrap">
+        <div class="table-wrap tabela-rolavel">
           <table>
             <thead><tr><th>Data</th><th>Produto</th><th>Rede</th><th>Resultado</th><th>Por</th></tr></thead>
             <tbody id="social-log"></tbody>
@@ -2271,7 +2278,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
 </dialog>
 
 <script src="/js/menu-celular.js?v=20261335"></script>
-<script src="/js/admin.js?v=20261338"></script>
+<script src="/js/admin.js?v=20261339"></script>
 <script src="/js/wa-temas.js?v=20261335"></script>
 <script src="/js/envio-resultados.js?v=20261335"></script>
 <script src="/js/wa-proprio.js?v=20261335"></script>

@@ -227,12 +227,14 @@ router.get('/api/postagens/resultados', (req, res) => {
 });
 
 // Histórico: o admin vê o do site; cada cliente, só o dele. Usuários liberados não veem o histórico.
+// Vem com a foto e o link da loja, para o painel mostrar a miniatura e o produto clicável.
+const HIST = 'SELECT p.*, o.imagem, o.original_url FROM social_posts p LEFT JOIN offers o ON o.id = p.offer_id';
 router.get('/api/postagens/historico', (req, res) => {
   if (req.poster.clienteId) {
-    return res.json(db.all('SELECT * FROM social_posts WHERE cliente_id = ? ORDER BY id DESC LIMIT 100', req.poster.clienteId));
+    return res.json(db.all(`${HIST} WHERE p.cliente_id = ? ORDER BY p.id DESC LIMIT 100`, req.poster.clienteId));
   }
   if (req.poster.key !== 'admin') return res.status(403).json({ error: 'Somente o administrador.' });
-  res.json(db.all('SELECT * FROM social_posts WHERE cliente_id IS NULL ORDER BY id DESC LIMIT 100'));
+  res.json(db.all(`${HIST} WHERE p.cliente_id IS NULL ORDER BY p.id DESC LIMIT 100`));
 });
 
 module.exports = { router, poster, veComissao };

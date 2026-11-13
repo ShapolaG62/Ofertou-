@@ -8,6 +8,13 @@
   const fmtDay = s => (String(s).startsWith('9999') ? 'sem vencimento' : s ? new Date(String(s).replace(' ', 'T') + 'Z').toLocaleDateString('pt-BR') : '—');
   const REDE = { telegram: 'Telegram', facebook: 'Facebook', instagram: 'Instagram', x: 'X (Twitter)', whatsapp: 'WhatsApp' };
   const FILA = { pendente: 'Na fila', postado: 'Postado', erro: 'Erro', expirado: 'Saiu do ar' };
+  // Produto da fila/histórico: miniatura + nome que abre a oferta no site + link da loja
+  function celulaProduto(r, nome) {
+    const foto = /^(https:\/\/|\/uploads\/)/i.test(r.imagem || '') ? `<img class="post-foto" src="${esc(r.imagem)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="post-foto"></span>';
+    const titulo = r.offer_id ? `<a class="post-nome" href="/oferta/${Number(r.offer_id)}" target="_blank" rel="noopener">${esc(nome)}</a>` : `<span class="post-nome">${esc(nome)}</span>`;
+    const loja = /^https:\/\//i.test(r.original_url || '') ? `<a class="post-loja" href="${esc(r.original_url)}" target="_blank" rel="noopener noreferrer">Ver na loja ↗</a>` : '';
+    return `<div class="post-prod">${foto}<div>${titulo}${loja}</div></div>`;
+  }
   let CFG = {};
 
   async function api(path, opts = {}) {
@@ -387,7 +394,7 @@
       ${ult ? `<br>Última rodada: ${ult.feitos.filter(f => f.ok).length} de ${ult.feitos.length} publicadas em ${fmtDate(ult.em)}${ult.conferidos ? ` · ${ult.conferidos} com preço conferido na loja na hora` : ''}${ult.pulados?.length ? ` · ${ult.pulados.length} pulada(s) por mudança na loja, no tema ou foto recusada` : ''}` : ''}
       ${estado.problema ? `<br><b>Atenção:</b> ${esc(estado.problema.mensagem)}` : ''}`;
     $('#fila-body').innerHTML = fila.length ? fila.map(q => `<tr>
-        <td>${esc(q.produto || `oferta #${q.offer_id}`)}</td>
+        <td>${celulaProduto(q, q.produto || `oferta #${q.offer_id}`)}</td>
         <td><span class="status-pill ${q.status === 'postado' ? 'ok' : q.status === 'erro' ? 'err' : ''}">${FILA[q.status] || q.status}</span></td>
         <td class="cli-hint">${esc(q.resultado || '')}</td>
         <td>${q.status === 'pendente' ? `<button class="btn btn-sm" type="button" data-fila-del="${q.id}">Tirar</button>` : ''}</td></tr>`).join('')
@@ -413,7 +420,7 @@
   async function carregarHistorico() {
     const rows = await api('/api/postagens/historico');
     $('#hist-body').innerHTML = rows.length ? rows.map(r => `<tr>
-        <td>${fmtDate(r.created_at)}</td><td>${esc((r.produto || '—').slice(0, 70))}</td><td>${esc(REDE[r.rede] || r.rede)}</td>
+        <td>${fmtDate(r.created_at)}</td><td>${celulaProduto(r, r.produto || '—')}</td><td>${esc(REDE[r.rede] || r.rede)}</td>
         <td>${r.ok ? '<span class="status-pill ok">Publicado</span>' : `<span class="status-pill err">Erro</span> <span class="cli-hint">${esc(r.mensagem || '')}</span>`}</td></tr>`).join('')
       : '<tr><td colspan="4" class="cli-hint">Nenhuma postagem ainda.</td></tr>';
   }

@@ -92,7 +92,7 @@ function enfileirar(itens, autor, cid = null) {
 
 function listarFila(cid = null, limit = 200) {
   return db.all(
-    `SELECT q.*, o.produto, o.preco_atual, o.desconto_pct FROM post_queue q LEFT JOIN offers o ON o.id = q.offer_id
+    `SELECT q.*, o.produto, o.preco_atual, o.desconto_pct, o.imagem, o.original_url FROM post_queue q LEFT JOIN offers o ON o.id = q.offer_id
      WHERE q.cliente_id IS ?
      ORDER BY CASE q.status WHEN 'pendente' THEN 0 ELSE 1 END, CASE q.status WHEN 'pendente' THEN -q.prioridade ELSE 0 END, CASE q.status WHEN 'pendente' THEN q.created_at END DESC, CASE q.status WHEN 'pendente' THEN q.id ELSE -q.id END LIMIT ?`, cid, limit);
 }

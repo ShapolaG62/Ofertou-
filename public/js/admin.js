@@ -2370,6 +2370,14 @@ $('#wa-save-groups').addEventListener('click', async () => {
 
 // Agendamento e fila
 const FILA_STATUS = { pendente: 'Na fila', postado: 'Postado', erro: 'Erro', expirado: 'Saiu do ar' };
+// Produto da fila/histórico: miniatura + nome que abre a oferta no site + link da loja
+const fotoOk = u => /^(https:\/\/|\/uploads\/)/i.test(u || '');
+function celulaProduto(r, nome) {
+  const foto = fotoOk(r.imagem) ? `<img class="post-foto" src="${esc(r.imagem)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="post-foto"></span>';
+  const titulo = r.offer_id ? `<a class="offer-title" href="/oferta/${Number(r.offer_id)}" target="_blank" rel="noopener">${esc(nome)}</a>` : `<span class="offer-title">${esc(nome)}</span>`;
+  const loja = /^https:\/\//i.test(r.original_url || '') ? `<a class="post-loja" href="${esc(r.original_url)}" target="_blank" rel="noopener noreferrer">Ver na loja ↗</a>` : '';
+  return `<div class="post-prod">${foto}<div>${titulo}${loja}</div></div>`;
+}
 async function loadAgenda() {
   const { estado, fila } = await api('/api/admin/agenda');
   const ult = estado.ultimaExecucao;
@@ -2378,7 +2386,7 @@ async function loadAgenda() {
     ${ult ? `<br>Última rodada (${esc(ult.motivo)}): ${ult.feitos.filter(f => f.ok).length} de ${ult.feitos.length} publicadas em ${fmtDate(ult.em.replace('T', ' ').slice(0, 19))}${ult.conferidos ? ` · ${ult.conferidos} com preço conferido na loja na hora` : ''}${ult.pulados?.length ? ` · ${ult.pulados.length} pulada(s) por mudança na loja, no tema ou foto recusada` : ''}` : ''}
     ${estado.problema ? `<br><b>Atenção:</b> ${esc(estado.problema.mensagem)}` : ''}`;
   $('#fila-body').innerHTML = fila.length ? fila.map(q => `<tr>
-      <td><span class="offer-title">${esc(q.produto || `oferta #${q.offer_id}`)}</span></td>
+      <td>${celulaProduto(q, q.produto || `oferta #${q.offer_id}`)}</td>
       <td><span class="badge ${q.status === 'postado' ? 'b-ok' : q.status === 'erro' ? 'b-error' : q.status === 'pendente' ? 'b-pending' : 'b-none'}">${FILA_STATUS[q.status] || q.status}</span></td>
       <td class="num">${fmtDate(q.created_at)}</td>
       <td class="hint" style="max-width:340px">${esc(q.resultado || '')}</td>
@@ -2407,7 +2415,7 @@ async function loadSocialLog() {
   const rows = await api('/api/postagens/historico');
   $('#social-log').innerHTML = rows.length ? rows.map(r => `<tr>
       <td class="num">${fmtDate(r.created_at)}</td>
-      <td><span class="offer-title">${esc(r.produto || '—')}</span></td>
+      <td>${celulaProduto(r, r.produto || '—')}</td>
       <td>${esc(REDE_NOME[r.rede] || r.rede)}</td>
       <td>${r.ok ? '<span class="badge b-ok">Publicado</span>' : `<span class="badge b-error">Erro</span> <span class="hint">${esc(r.mensagem || '')}</span>`}</td>
       <td>${esc(r.autor || '—')}</td></tr>`).join('')
