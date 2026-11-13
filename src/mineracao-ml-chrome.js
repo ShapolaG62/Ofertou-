@@ -201,4 +201,4 @@ function estado() {
   };
 }
 
-module.exports = { proximos, receber, priorizar, estado, aprender, limparAprendidos, urlDaBusca, MAX_HTML };
+module.exports = { proximos, receber, priorizar, estado, aprender, limparAprendidos, termoRuim, distancia, urlDaBusca, MAX_HTML };

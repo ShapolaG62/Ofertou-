@@ -671,6 +671,12 @@ const STATUS_LABEL = {
 };
 let pollTimer = null;
 
+// Termos de marca e modelo aprendidos das ofertas das lojas com afiliado (valem para a busca de todas as lojas)
+function termosMarcaLinha(t) {
+  const texto = t.total ? `${t.hoje} hoje, ${t.total} no total${t.ultimos?.length ? ` · últimos: ${t.ultimos.slice(0, 6).map(x => x.q).join(', ')}` : ''}` : 'ligado, aprende uma vez por dia depois da mineração';
+  return `<tr class="tab-msg"><td colspan="5">🏷️ Termos de marca e modelo aprendidos das ofertas (para todas as lojas): ${esc(texto)}</td></tr>`;
+}
+
 // Anúncios comuns do Mercado Livre (fora do catálogo), buscados pela extensão no Chrome do administrador
 function mlChromeLinha(m) {
   let texto, ruim = false;
@@ -701,7 +707,7 @@ async function loadStores() {
       <td class="num" data-l="Gravadas">${s.automatic ? `${s.saved || 0} de ${s.found || 0}` : '—'}</td>
       <td class="num" data-l="Último sucesso">${s.automatic ? fmtDate(s.last_success_at) : '—'}</td></tr>
       ${s.message ? `<tr class="tab-msg"><td colspan="5" class="${status === 'ok' ? '' : 'ruim'}">${esc(s.message)}</td></tr>` : ''}
-      ${s.id === 'mercadolivre' && st.ml_chrome ? mlChromeLinha(st.ml_chrome) : ''}`;
+      ${s.id === 'mercadolivre' && st.ml_chrome ? mlChromeLinha(st.ml_chrome) : ''}${s.id === 'shopee' && st.termos_marca?.ligado ? termosMarcaLinha(st.termos_marca) : ''}`;
   }).join('')}</tbody></table>`;
   const lr = st.lastRun;
   $('#last-run').textContent = st.parando ? 'Parando a mineração… (termina a busca que está no meio)' : st.running ? 'Mineração em andamento...' :

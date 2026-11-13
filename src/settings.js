@@ -159,6 +159,8 @@ const DEFAULTS = {
   ml_chrome_aprender: '1',     // termos novos de 'Outras pessoas pesquisaram' nas buscas do ML pelo Chrome
   ml_chrome_novos_por_dia: '30',
   ml_chrome_termos_max: '1000', // tamanho máximo da lista de termos (com os aprendidos)
+  termos_marca_aprender: '1',   // termos de marca e modelo tirados das ofertas das lojas com afiliado (src/termos-marca.js)
+  termos_marca_por_dia: '20',
   agenda_nota_minima: '60',     // só vai para os grupos oferta com nota de viral a partir disso (src/nota-grupos.js)
   // Modo contínuo: entre o início e o fim, uma postagem a cada X a Y minutos (intervalo aleatório, parece gente)
   agenda_modo: 'horarios',      // 'horarios' (nos horários fixos) ou 'continuo'

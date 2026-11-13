@@ -149,7 +149,7 @@ router.get('/api/admin/dashboard', (req, res, next) => require('../busca-ofertas
 // ── Lojas e mineração ─────────────────────────────────────────────────────────
 router.get('/api/admin/stores', (req, res) => {
   res.json({ ...miner.getState(), enabled: settings.getEnabledStores(), categories: CATEGORIES, cupons: require('../cupons').resumo(),
-    ml_chrome: require('../mineracao-ml-chrome').estado() });
+    ml_chrome: require('../mineracao-ml-chrome').estado(), termos_marca: require('../termos-marca').estado() });
 });
 
 router.post('/api/admin/mine/parar', (req, res) => res.json(miner.pararMineracao()));

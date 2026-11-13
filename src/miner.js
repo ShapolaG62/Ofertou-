@@ -208,6 +208,8 @@ function startScheduler() {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try { await runMining(); } catch (err) { console.error('[MINER] erro inesperado:', err); }
+      // Uma vez por dia: termos de marca e modelo a partir das ofertas das lojas com afiliado
+      try { const n = await require('./termos-marca').aprender(); if (n.length) console.log(`[TERMOS] ${n.length} termo(s) de marca: ${n.join(', ')}`); } catch (err) { console.error('[TERMOS]', err.message); }
       try { await require('./lojas').syncAllFeeds(); } catch (err) { console.error('[LOJAS] erro ao sincronizar feeds:', err); }
       schedule(Math.max(15, settings.getNumber('mining_interval_min', 120)) * 60 * 1000);
     }, delayMs);

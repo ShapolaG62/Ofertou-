@@ -1078,6 +1078,8 @@
             <label class="field">Aprender termos novos nas buscas do ML <select name="ml_chrome_aprender"><option value="1">Sim</option><option value="0">Não</option></select></label>
             <label class="field">Termos novos por dia (no máximo) <input type="number" name="ml_chrome_novos_por_dia" min="0" max="500"></label>
             <label class="field">Tamanho máximo da lista de termos <input type="number" name="ml_chrome_termos_max" min="0" max="5000"></label>
+            <label class="field">Aprender termos de marca e modelo das ofertas <select name="termos_marca_aprender"><option value="1">Sim</option><option value="0">Não</option></select></label>
+            <label class="field">Termos de marca por dia (no máximo) <input type="number" name="termos_marca_por_dia" min="0" max="300"></label>
             <label class="field">Tirar do ar se não for vista há (horas) <input type="number" name="offer_max_age_hours" min="1" max="168"></label>
             <label class="field">Desconto mínimo (%) <input type="number" name="min_discount_pct" min="1" max="90"></label>
             <label class="field">Validade padrão de ofertas manuais (dias) <input type="number" name="manual_offer_days" min="1" max="60"></label>
@@ -2269,7 +2271,7 @@ GET    /api/wa/colecoes              (?numero=)</pre></details>
 </dialog>
 
 <script src="/js/menu-celular.js?v=20261335"></script>
-<script src="/js/admin.js?v=20261337"></script>
+<script src="/js/admin.js?v=20261338"></script>
 <script src="/js/wa-temas.js?v=20261335"></script>
 <script src="/js/envio-resultados.js?v=20261335"></script>
 <script src="/js/wa-proprio.js?v=20261335"></script>
