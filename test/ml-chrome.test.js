@@ -143,17 +143,19 @@ test('aprende termos novos em "Outras pessoas pesquisaram", só os bons e dentro
   const airFryer = [{ q: 'moldura de canto de teto', categoria: 'MLB418817' }, { q: 'air frayer', categoria: 'MLB456045' },
     { q: 'air frier', categoria: 'MLB456045' }, { q: 'revestimento banheiro', categoria: null }];
   const fone = [{ q: 'livros revistas comics', categoria: null }, { q: 'fone bluetooth com botão', categoria: 'MLB7457' }, { q: 'carros motos outros', categoria: null }];
-  assert.deepEqual(mlChrome.aprender('chinelo', chinelo), ['chinelo feminino', 'chinelo masculino', 'chinelo nuvem', 'chinelo nike', 'chinelo havaianas feminina']);
+  assert.deepEqual(mlChrome.aprender('chinelo', chinelo), ['chinelo feminino', 'chinelo masculino', 'chinelo nuvem'], 'no máximo 3 por busca');
   assert.deepEqual(mlChrome.aprender('air fryer', airFryer), [], 'sem relação com a busca ou erro de digitação de um termo que já existe');
   assert.deepEqual(mlChrome.aprender('fone bluetooth', fone), ['fone bluetooth com botão'], 'sem categoria é lixo');
   const termos = settings.getSearchTerms();
   assert.deepEqual(termos.find(t => t.query === 'chinelo nuvem'), { query: 'chinelo nuvem', cat: 'moda' }, 'herda a categoria do termo de origem');
-  assert.deepEqual(mlChrome.aprender('chinelo', chinelo), [], 'não repete o que já entrou');
+  assert.deepEqual(mlChrome.aprender('chinelo', chinelo), ['chinelo nike', 'chinelo havaianas feminina'], 'na próxima vez, os que faltaram; não repete os que já entraram');
   const e = mlChrome.estado().novos;
   assert.equal(e.hoje, 6);
-  assert.equal(e.ultimos[0].q, 'fone bluetooth com botão');
+  assert.equal(e.ultimos[0].q, 'chinelo nike');
   // Limites: por dia e tamanho da lista
   settings.set('ml_chrome_novos_por_dia', '7');
+  assert.deepEqual(mlChrome.aprender('fogao 4 bocas', [{ q: 'do fogao 4 bocas usado', categoria: 'MLB1' }, { q: 'fogao 4 bocas usados', categoria: 'MLB1' }, { q: 'fogao 4 bocas suggar inox', categoria: 'MLB1' }]), ['fogao 4 bocas suggar inox'], 'usado e pedaço de frase ficam de fora');
+  settings.set('ml_chrome_novos_por_dia', '8');
   assert.equal(mlChrome.aprender('chinelo', [{ q: 'chinelo slide', categoria: 'MLB1' }, { q: 'chinelo infantil', categoria: 'MLB1' }]).length, 1);
   settings.set('ml_chrome_novos_por_dia', '30');
   settings.set('ml_chrome_termos_max', String(settings.getSearchTerms().length));
@@ -171,4 +173,14 @@ test('a página de busca que a extensão traz já ensina os termos relacionados'
     + '1:{"q":"sandalia","related_searches":[{"q":"sandalia papete","category_id":"MLB273770","keyword_source":"X"},{"q":"carros motos outros","category_id":"UNKNOWN_CATEGORY"}]}\n';
   mlChrome.receber({ query: 'sandalia', html: `_n.ctx.s["nr"].q(${JSON.stringify(texto)})` });
   assert.deepEqual(settings.getSearchTerms().map(t => t.query), ['sandalia', 'sandalia papete']);
+});
+
+test('limpeza: tira da lista os termos aprendidos que as regras novas recusariam, sem mexer nos termos do dono', () => {
+  settings.set('search_terms', 'fogao | eletrodomesticos\nfogao usado\ndo fogao 4 bocas usado | eletrodomesticos\nfogao 4 bocas suggar inox | eletrodomesticos');
+  settings.set('ml_chrome_novos', JSON.stringify({ dia: '2026-11-13', hoje: 2, total: 2, ultimos: [
+    { q: 'do fogao 4 bocas usado', origem: 'fogao 4 bocas' }, { q: 'fogao 4 bocas suggar inox', origem: 'fogao 4 bocas' }] }));
+  assert.equal(mlChrome.limparAprendidos(), 1);
+  assert.deepEqual(settings.getSearchTerms().map(t => t.query), ['fogao', 'fogao usado', 'fogao 4 bocas suggar inox'], '"fogao usado" foi você que pôs: fica');
+  assert.equal(mlChrome.estado().novos.total, 1);
+  assert.equal(mlChrome.limparAprendidos(), 0, 'rodar de novo não faz nada');
 });

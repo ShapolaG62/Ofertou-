@@ -325,6 +325,7 @@ app.use('/uploads', express.static(UPLOADS_DIR, {
   app.post('/api/extensao/ml-lidos', comChave, (req, res) => res.json(leitor.receber(req.body?.itens)));
   // Mineração do Mercado Livre pelo Chrome (src/mineracao-ml-chrome.js): termos para buscar e a página de cada busca
   const mlChrome = require('./src/mineracao-ml-chrome');
+  try { const n = mlChrome.limparAprendidos(); if (n) console.log(`[ML CHROME] ${n} termo(s) aprendido(s) ruim(ns) tirado(s) da lista`); } catch { /* segue */ }
   app.get('/api/extensao/ml-buscas', comChave, (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ buscas: mlChrome.proximos() }); });
   app.post('/api/extensao/ml-busca', comChave, (req, res) => res.json(mlChrome.receber(req.body || {})));
 }

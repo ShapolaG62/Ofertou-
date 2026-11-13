@@ -128,6 +128,25 @@ function distancia(a, b) { // Levenshtein: quantas letras mudam de um para o out
   }
   return ant[b.length];
 }
+// Termo que não serve para achar oferta: produto usado/conserto/peça, pergunta, pedaço de frase ("do fogão…") ou longo demais
+const POR_BUSCA = 3; // uma busca só não ocupa as vagas do dia
+const PALAVRA_RUIM = /\b(usado|usados|usada|usadas|seminovo|seminova|seminovos|recondicionado|recondicionada|defeito|conserto|consertar|assistencia|peca|pecas|manual|como|aluguel|alugar|gratis|quanto custa|olx|desapego)\b/;
+const COMECO_RUIM = /^(de|do|da|dos|das|para|pra|com|sem|e|o|a|os|as|em|no|na|um|uma)\s/;
+const termoRuim = n => PALAVRA_RUIM.test(n) || COMECO_RUIM.test(n) || n.split(' ').length > 6;
+
+// Tira da lista os termos aprendidos que as regras de hoje recusariam (roda ao ligar o site; não mexe nos seus termos)
+function limparAprendidos() {
+  const st = ler(NOVOS, null);
+  if (!st?.ultimos?.length) return 0;
+  const ruins = new Set(st.ultimos.filter(x => termoRuim(semAcento(x.q))).map(x => x.q));
+  if (!ruins.size) return 0;
+  const linhas = String(settings.get('search_terms') || '').split(/\r?\n/);
+  const ficam = linhas.filter(l => !ruins.has(l.split('|')[0].trim()));
+  if (ficam.length !== linhas.length) settings.set('search_terms', ficam.join('\n'));
+  settings.set(NOVOS, JSON.stringify({ ...st, total: Math.max(0, (st.total || 0) - ruins.size), ultimos: st.ultimos.filter(x => !ruins.has(x.q)) }));
+  return linhas.length - ficam.length;
+}
+
 function aprender(origem, relacionadas) {
   if (settings.get('ml_chrome_aprender') === '0' || !relacionadas?.length) return [];
   const porDia = Math.min(Math.max(parseInt(settings.get('ml_chrome_novos_por_dia') ?? '30', 10) || 0, 0), 500);
@@ -143,15 +162,18 @@ function aprender(origem, relacionadas) {
   const cat = (termos.find(t => t.query === origem) || {}).cat || null;
   const proibidas = require('./palavras-proibidas');
   const novos = [];
+  let novosDestaBusca = 0;
   for (const { q, categoria } of relacionadas) {
     if (vagas <= 0) break;
     const n = semAcento(q);
-    if (!categoria || n.length < 3 || n.length > 60 || /^\d+$/.test(n)) continue;
+    if (novosDestaBusca >= POR_BUSCA) break;
+    if (!categoria || n.length < 3 || n.length > 60 || /^\d+$/.test(n) || termoRuim(n)) continue;
     if (!palavrasDe(n).some(p => daOrigem.has(p))) continue;
     if (existentes.some(e => e === n || distancia(e, n) <= 2) || novos.some(x => distancia(semAcento(x), n) <= 2)) continue;
     if (proibidas.bloqueia(n)) continue;
     novos.push(q.trim().toLowerCase().slice(0, 60));
     vagas--;
+    novosDestaBusca++;
   }
   if (!novos.length) return [];
   const atual = String(settings.get('search_terms') || '').replace(/\s+$/, '');
@@ -179,4 +201,4 @@ function estado() {
   };
 }
 
-module.exports = { proximos, receber, priorizar, estado, aprender, urlDaBusca, MAX_HTML };
+module.exports = { proximos, receber, priorizar, estado, aprender, limparAprendidos, urlDaBusca, MAX_HTML };
