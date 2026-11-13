@@ -128,6 +128,8 @@ module.exports = {
   name: 'Shopee',
   method: 'API oficial Shopee Afiliados (relevância + mais vendidos, até 150 por termo)',
   automatic: true,
+  // A API dá muito "System Error" e cada termo pode levar bem mais: no máximo 50 min por rodada, com rodízio próprio (src/miner.js)
+  tempoMaxMin: 50,
   isReady: s => (s.shopee_app_id && s.shopee_app_secret)
     ? { ready: true }
     : { ready: false, reason: 'Informe o App ID e a Senha da API do Shopee Afiliados no painel.' },

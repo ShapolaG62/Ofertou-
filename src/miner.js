@@ -5,7 +5,7 @@ const offers = require('./offers');
 const { STORES } = require('./stores');
 const { sleep } = require('./util');
 
-const DELAY_BETWEEN_QUERIES_MS = 2500;
+let DELAY_BETWEEN_QUERIES_MS = 2500; // os testes zeram
 // Gravar uma oferta segura o servidor por alguns milissegundos: a cada 20, deixa o site atender quem está esperando
 const respirar = () => new Promise(r => setImmediate(r));
 
@@ -39,7 +39,7 @@ function setStatus(storeId, fields) {
   );
 }
 
-async function mineStore(store, terms, s, log, { varredura = false } = {}) {
+async function mineStore(store, terms, s, log, { varredura = false, consulta = false } = {}) {
   const now = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
   const ready = store.isReady(s);
   if (!ready.ready) {
@@ -49,8 +49,20 @@ async function mineStore(store, terms, s, log, { varredura = false } = {}) {
 
   setStatus(store.id, { status: 'running', message: 'Minerando...', last_run_at: now() });
   let found = 0, saved = 0, lastStatus = 'ok', lastMessage = '';
+  // Loja lenta (store.tempoMaxMin, ex.: Shopee com "System Error" frequente): anda na lista inteira com o próprio
+  // marcador e para no tempo limite; a próxima rodada continua de onde parou. Antes a Shopee levava 3 horas e a
+  // rodada inteira ficava presa esperando por ela (nada de mineração nova nem de termos de marca).
+  const proprio = Boolean(store.tempoMaxMin) && !consulta;
+  const limite = proprio ? Date.now() + (Number(settings.get(`mining_tempo_${store.id}_min`)) || store.tempoMaxMin) * 60000 : Infinity;
+  let cursor = 0;
+  if (proprio) {
+    const todos = settings.getSearchTerms();
+    cursor = (Number(settings.get(`mining_cursor_${store.id}`)) || 0) % Math.max(1, todos.length);
+    terms = [...todos.slice(cursor), ...todos.slice(0, cursor)];
+  }
   for (let i = 0; i < terms.length; i++) {
     if (parar) { lastStatus = 'stopped'; lastMessage = `Parada pelo administrador (${i} de ${terms.length} termos)`; break; }
+    if (Date.now() > limite) { lastMessage = `Tempo da rodada acabou: ${i} termos agora, continua do termo ${(cursor + i) % terms.length + 1} na próxima`; break; }
     const term = terms[i];
     let result;
     try {
@@ -77,6 +89,8 @@ async function mineStore(store, terms, s, log, { varredura = false } = {}) {
         log(`[${store.name}] falha ao gravar: ${err.message}`);
       }
     }
+    // Termo feito: a próxima rodada desta loja começa no seguinte
+    if (proprio) settings.set(`mining_cursor_${store.id}`, String((cursor + i + 1) % terms.length));
     if (i < terms.length - 1) await esperar(DELAY_BETWEEN_QUERIES_MS);
   }
 
@@ -164,7 +178,7 @@ async function runMining(options = {}) {
         setStatus(store.id, { status: 'disabled', message: 'Desativada no painel', found: 0, saved: 0 });
         return { store: store.id, status: 'disabled', found: 0, saved: 0 };
       }
-      return mineStore(store, terms, s, log, { varredura: !options.query });
+      return mineStore(store, terms, s, log, { varredura: !options.query, consulta: Boolean(options.query) });
     }));
     const purged = offers.purgeOld();
     lastRun = { startedAt, finishedAt: new Date().toISOString(), results, purged, query: options.query || null, parada: parar };
@@ -218,4 +232,5 @@ function startScheduler() {
 }
 
 module.exports = {
+  _mineStore: mineStore, _paraTestes: ({ pausa } = {}) => { if (pausa !== undefined) DELAY_BETWEEN_QUERIES_MS = pausa; },
   minerarTermo, statusPublico, runMining, pararMineracao, getState, startScheduler };
