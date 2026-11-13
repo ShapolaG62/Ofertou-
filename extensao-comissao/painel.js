@@ -6,8 +6,10 @@
   const ORIGEM = location.origin;
   chrome.storage.local.set({ painel: ORIGEM, soGanhoCliente: false }); // endereço do Painel, para voltar depois de buscar
 
-  // Leitor do Mercado Livre: a chave para a extensão falar com o site (só o administrador logado recebe)
-  if (window === window.top) {
+  // Leitor do Mercado Livre: a chave para a extensão falar com o site (só o administrador logado recebe).
+  // O Painel abre sozinho ou dentro da Central (/central, num quadro): vale nos dois casos, uma vez só por página
+  const dentroDaCentral = window !== window.top && window.parent === window.top && location.pathname.startsWith('/admin');
+  if (window === window.top || dentroDaCentral) {
     fetch('/api/admin/extensao/leitor', { cache: 'no-store', credentials: 'same-origin' })
       .then(r => (r.ok ? r.json() : null))
       .then(async d => {
