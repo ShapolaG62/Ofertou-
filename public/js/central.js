@@ -45,7 +45,9 @@
 
   function desenharMenu() {
     const logo = '<img class="central-logo" src="/images/logo-ofertou.png" alt="Ofertou!">';
-    menu.innerHTML = logo + areas.map(a => `<button type="button" data-area="${a.id}"${a.id === atual ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[a.id] || ''}</svg>${a.nome}</button>`).join('');
+    // Tema (claro, escuro ou automático) no pé da barra, no computador; no celular ele fica no menu da conta
+    const tema = '<div class="central-tema"><span>Tema</span><div data-tema-controle class="so-icones"></div></div>';
+    menu.innerHTML = logo + areas.map(a => `<button type="button" data-area="${a.id}"${a.id === atual ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[a.id] || ''}</svg>${a.nome}</button>`).join('') + tema;
   }
 
   function guardarEndereco() {
