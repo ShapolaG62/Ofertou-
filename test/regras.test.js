@@ -217,9 +217,32 @@ test('páginas de categoria e marca', () => {
   const seo = require('../src/paginas/ofertas-seo');
   const p = seo.pagina(['eletrodomesticos'], 'https://exemplo.test');
   assert.match(p.html, /<link rel="canonical" href="https:\/\/exemplo.test\/ofertas\/eletrodomesticos">/);
-  assert.match(p.html, /Geladeira Brastemp/);
+  // As ofertas estão na grade do HTML (cartões com nome e link), não só nos dados estruturados: o Google vê sem JavaScript
+  const grade = p.html.slice(p.html.indexOf('id="grid"'), p.html.indexOf('id="pagination"'));
+  assert.match(grade, /class="card"[\s\S]*Geladeira Brastemp/, 'os cartões entram no HTML no lugar dos esqueletos');
+  assert.doesNotMatch(p.html, /<div class="skeleton">/, 'não sobra esqueleto de carregamento');
   assert.equal(seo.pagina(['nao-existe'], 'https://exemplo.test'), null);
   assert.equal(seo.pagina(['marca', 'nao-existe'], 'https://exemplo.test'), null);
+});
+
+test('páginas de categoria: paginação que o Google segue', () => {
+  for (let i = 0; i < 30; i++) oferta(amazon, `Geladeira Consul ${300 + i * 7} litros frost free cor ${i}`, 3000 + i, 2200 + i);
+  busca.montar();
+  const seo = require('../src/paginas/ofertas-seo');
+  seo._limparCache();
+  const p1 = seo.pagina(['eletrodomesticos'], 'https://exemplo.test', 1);
+  const total = busca.buscar({ cat: 'eletrodomesticos', por: seo.POR }, { comissao: false }).paginas;
+  assert.ok(total >= 2, `mais de uma página (${total})`);
+  assert.match(p1.html, /<a class="page-btn" href="\/ofertas\/eletrodomesticos\?pagina=2" rel="next"/, 'link de verdade para a próxima');
+  assert.match(p1.html, /<link rel="canonical" href="https:\/\/exemplo.test\/ofertas\/eletrodomesticos">/);
+  const p2 = seo.pagina(['eletrodomesticos'], 'https://exemplo.test', 2);
+  assert.match(p2.html, /<link rel="canonical" href="https:\/\/exemplo.test\/ofertas\/eletrodomesticos\?pagina=2">/, 'cada página com o próprio canonical');
+  assert.match(p2.html, /<title>[^<]*\(página 2\)/);
+  assert.match(p2.html, /href="\/ofertas\/eletrodomesticos" rel="prev"/, 'a anterior da 2 é a página sem ?pagina');
+  const ids = html => new Set([...html.matchAll(/class="card" href="[^"]*" [^>]*data-id="(\d+)"/g)].map(m => m[1]));
+  const a = ids(p1.html), b = ids(p2.html);
+  assert.ok(a.size && b.size && [...b].every(id => !a.has(id)), 'a página 2 tem outras ofertas');
+  assert.equal(seo.pagina(['eletrodomesticos'], 'https://exemplo.test', total + 1), null, 'depois da última não existe');
 });
 
 test('origem do clique', () => {

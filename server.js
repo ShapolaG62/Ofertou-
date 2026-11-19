@@ -245,7 +245,9 @@ app.get('/ferramenta', (req, res) => {
 app.get(/^\/ofertas\/([a-z0-9-]+(?:\/[a-z0-9-]+)?)\/?$/, (req, res, next) => {
   if (!access.canSeeOffers(req)) return res.redirect('/conta');
   const seo = require('./src/paginas/ofertas-seo');
-  const p = seo.pagina(req.params[0].split('/'), seo.baseDe(req));
+  // ?pagina=1 é a própria página da seção: um endereço só para o Google
+  if (req.query.pagina === '1') return res.redirect(301, req.path);
+  const p = seo.pagina(req.params[0].split('/'), seo.baseDe(req), req.query.pagina);
   if (!p) return next();
   res.type('html').setHeader('Cache-Control', 'no-cache');
   res.send(p.html);

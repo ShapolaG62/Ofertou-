@@ -63,9 +63,11 @@ function marcaLoja(o) {
   return ['mercadolivre', 'amazon', 'kabum'].includes(o.store_id) ? img(o.store_id, ' tema-claro') + img(`${o.store_id}-escuro`, ' tema-escuro') : img(o.store_id, '');
 }
 
-function cartao(o) {
+function cartao(o, pos) {
+  // As 2 primeiras fotos carregam já (são a maior imagem da tela no celular); o resto, quando chegar perto
+  const carregar = pos < 2 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
   return `<a class="card" href="/oferta/${h(slugOferta(o))}" target="_blank" rel="noopener sponsored nofollow" data-id="${o.id}">
-      <div class="card-media"><img src="/img/p/${o.id}.webp" alt="" loading="lazy" decoding="async" width="300" height="300">
+      <div class="card-media"><img src="/img/p/${o.id}.webp" alt="" ${carregar} decoding="async" width="400" height="400">
         <div class="card-tags"><span class="card-off">-${Math.round(o.desconto_pct)}%</span></div></div>
       <div class="card-body"><div class="card-store">${marcaLoja(o)}</div>
         <h3 class="card-title">${h(o.produto)}</h3>
@@ -74,30 +76,51 @@ function cartao(o) {
       </div></a>`;
 }
 
+// Paginação que o Google consegue seguir: /ofertas/celulares?pagina=2 (o mesmo parâmetro que site.js usa no navegador).
+// Cada página tem o próprio canonical e links <a> de verdade para as vizinhas; o JavaScript troca pelos botões de sempre.
+const POR = 24;
+function paginacao(caminho, atual, total) {
+  if (total <= 1) return '';
+  const link = n => `${caminho}${n > 1 ? `?pagina=${n}` : ''}`;
+  const nums = [...new Set([1, total, atual - 1, atual, atual + 1].filter(n => n >= 1 && n <= total))].sort((a, b) => a - b);
+  const partes = [atual > 1 ? `<a class="page-btn" href="${link(atual - 1)}" rel="prev" aria-label="Página anterior">‹</a>` : ''];
+  nums.forEach((n, i) => {
+    if (i && n - nums[i - 1] > 1) partes.push('<span class="page-gap">…</span>');
+    partes.push(n === atual ? `<span class="page-btn" aria-current="page">${n}</span>` : `<a class="page-btn" href="${link(n)}">${n}</a>`);
+  });
+  if (atual < total) partes.push(`<a class="page-btn" href="${link(atual + 1)}" rel="next" aria-label="Próxima página">›</a>`);
+  return partes.join('');
+}
+
 const CACHE = new Map();
-function pagina(partes, base) {
-  const chave = partes.join('/');
+function pagina(partes, base, numPagina = 1) {
+  const num = Math.max(1, Math.floor(Number(numPagina)) || 1);
+  const chave = `${partes.join('/')}#${num}`;
   const guardada = CACHE.get(chave);
   if (guardada && Date.now() - guardada.em < 5 * 60 * 1000) return guardada;
   const p = resolver(partes);
   if (!p) return null;
-  const r = busca.buscar({ ...p.filtro, por: 24 }, { comissao: false });
+  const r = busca.buscar({ ...p.filtro, por: POR, pagina: num }, { comissao: false });
+  if (num > 1 && num > r.paginas) return null; // página depois da última: não existe (404)
   const lojas = Object.keys(r.contagens?.lojas || {}).map(k => LOJAS[k]).filter(Boolean);
-  const menor = r.itens.reduce((m, o) => Math.min(m, o.preco_atual), Infinity);
-  const maiorDesc = r.itens.reduce((m, o) => Math.max(m, o.desconto_pct), 0);
+  // Os números do título e da introdução vêm sempre da 1ª página, para todas as páginas da seção dizerem o mesmo
+  const primeira = num > 1 ? busca.buscar({ ...p.filtro, por: POR }, { comissao: false }) : r;
+  const menor = primeira.itens.reduce((m, o) => Math.min(m, o.preco_atual), Infinity);
+  const maiorDesc = primeira.itens.reduce((m, o) => Math.max(m, o.desconto_pct), 0);
   const curto = p.curto || p.nome;
-  const titulo = `${p.marca ? p.nome : `Ofertas de ${curto}`}: até ${maiorDesc}% de desconto | Ofertou!`;
-  const descricao = `${r.total.toLocaleString('pt-BR')} ofertas de ${curto} com preços conferidos várias vezes por dia${lojas.length ? ` em ${lojas.slice(0, 4).join(', ')}` : ''}. Compare e vá direto para a loja.`;
-  const url = `${base}${p.caminho}`;
+  const sufixo = num > 1 ? ` (página ${num})` : '';
+  const titulo = `${p.marca ? p.nome : `Ofertas de ${curto}`}: até ${maiorDesc}% de desconto${sufixo} | Ofertou!`;
+  const descricao = `${r.total.toLocaleString('pt-BR')} ofertas de ${curto} com preços conferidos várias vezes por dia${lojas.length ? ` em ${lojas.slice(0, 4).join(', ')}` : ''}. Compare e vá direto para a loja.${num > 1 ? ` Página ${num} de ${r.paginas}.` : ''}`;
+  const url = `${base}${p.caminho}${num > 1 ? `?pagina=${num}` : ''}`;
   const migalhas = [{ nome: 'Ofertas', url: `${base}/` }];
   if (p.cat) migalhas.push({ nome: NOMES[p.cat], url: `${base}/ofertas/${slugCat(p.cat)}` });
-  if (p.tipo || p.marca) migalhas.push({ nome: p.tipo || p.marca, url });
+  if (p.tipo || p.marca) migalhas.push({ nome: p.tipo || p.marca, url: `${base}${p.caminho}` });
   const ld = [{
     '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: migalhas.map((m, i) => ({ '@type': 'ListItem', position: i + 1, name: m.nome, item: m.url })),
   }, {
     '@context': 'https://schema.org', '@type': 'ItemList', name: titulo, numberOfItems: r.itens.length,
-    itemListElement: r.itens.slice(0, 24).map((o, i) => ({ '@type': 'ListItem', position: i + 1, name: o.produto })),
+    itemListElement: r.itens.slice(0, POR).map((o, i) => ({ '@type': 'ListItem', position: (num - 1) * POR + i + 1, name: o.produto })),
   }];
   // Links para o Google (e para quem navega): tipos da categoria ou as outras categorias
   const tipos = p.cat ? Object.entries(tiposNoAr()[p.cat] || {}).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]).slice(0, 24) : [];
@@ -122,9 +145,14 @@ function pagina(partes, base) {
 <script>window.OFERTOU_PAGINA=${JSON.stringify({ caminho: p.caminho, cat: p.filtro.cat || '', tipo: p.filtro.tipo || '', q: p.filtro.q || '' }).replace(/</g, '\\u003c')}</script>
 </head>`);
   troca(/<main>/, '<main class="pagina-seo">');
-  troca(/<h1>[\s\S]*?<\/h1>/, `<h1>${h(p.marca ? p.nome : `Ofertas de ${curto}`)}</h1>`);
+  troca(/<h1>[\s\S]*?<\/h1>/, `<h1>${h(p.marca ? p.nome : `Ofertas de ${curto}`)}${sufixo}</h1>`);
   troca(/<p class="lead">[\s\S]*?<\/p>/, `<p class="lead">${h(intro)}</p>`);
-  troca(/<div class="grid" id="grid" aria-live="polite"><\/div>/, `<div class="grid" id="grid" aria-live="polite">${r.itens.map(cartao).join('')}</div>`);
+  // A grade do index.html pode vir com os "esqueletos" de carregamento dentro: troca a grade inteira pelos cartões
+  // (se o index.html mudar e a grade não for achada, o teste de ofertas-seo acusa)
+  troca(/<div class="grid" id="grid" aria-live="polite">(?:<div class="skeleton"><\/div>\s*)*<\/div>/,
+    `<div class="grid" id="grid" aria-live="polite">${r.itens.map(cartao).join('')}</div>`);
+  troca(/<nav class="pagination" id="pagination" aria-label="Paginação"><\/nav>/,
+    `<nav class="pagination" id="pagination" aria-label="Paginação">${paginacao(p.caminho, num, r.paginas)}</nav>`);
   troca(/<nav class="explore-links"[^>]*>[\s\S]*?<\/nav>/, `<nav class="explore-links" aria-label="Explore"><h2>${tipos.length ? `Tipos de ${h(NOMES[p.cat])}` : 'Categorias'}</h2><div>${ligacoes}</div></nav>`);
   const pronta = { em: Date.now(), html, vazia: !r.total };
   CACHE.set(chave, pronta);
@@ -146,4 +174,4 @@ function enderecos() {
 
 const baseDe = req => String(settings.get('site_url') || '').replace(/\/+$/, '') || `${req.protocol}://${req.get('host')}`;
 
-module.exports = { pagina, enderecos, baseDe };
+module.exports = { pagina, enderecos, baseDe, POR, _limparCache: () => CACHE.clear() };
