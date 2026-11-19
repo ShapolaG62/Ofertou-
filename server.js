@@ -278,8 +278,14 @@ app.get('/robots.txt', (req, res) => {
 app.get('/sitemap.xml', (req, res) => {
   const base = String(require('./src/settings').get('site_url') || '').replace(/\/+$/, '') || baseUrl(req);
   const hoje = new Date().toISOString().slice(0, 10);
-  const urls = [['/', 'hourly', '1.0'], ['/conta', 'weekly', '0.8'], ['/ajuda', 'monthly', '0.6'], ['/anuncie', 'monthly', '0.5'], ['/ferramenta', 'weekly', '0.7'], ['/privacidade', 'yearly', '0.3']]
-    .map(([p, freq, pri]) => ({ loc: base + p, freq, pri }));
+  // Data de alteração de verdade: as páginas fixas usam a data do próprio arquivo; a home e as categorias mudam todo dia
+  // (ofertas novas a cada rodada de mineração). Data sempre "hoje" em tudo faz o Google ignorar o campo.
+  // /conta (entrar/criar conta) não entra: é marcada para não indexar.
+  const dataDe = arq => { try { return fs.statSync(arq).mtime.toISOString().slice(0, 10); } catch { return null; } };
+  const urls = [['/', 'hourly', '1.0', hoje], ['/ajuda', 'monthly', '0.6', dataDe(path.join(PUBLIC_DIR, 'ajuda.html'))],
+    ['/anuncie', 'monthly', '0.5', dataDe(path.join(PUBLIC_DIR, 'anuncie.html'))], ['/ferramenta', 'weekly', '0.7', dataDe(path.join(__dirname, 'src', 'paginas', 'ferramenta.js'))],
+    ['/privacidade', 'yearly', '0.3', dataDe(path.join(PUBLIC_DIR, 'privacidade.html'))]]
+    .map(([p, freq, pri, mod]) => ({ loc: base + p, freq, pri, mod }));
   try {
     const lojas = require('./src/db').all(`SELECT lj.slug FROM lojas lj JOIN users u ON u.id = lj.user_id
       WHERE lj.oculta = 0 AND u.status = 'active' ORDER BY lj.id LIMIT 5000`);
@@ -289,7 +295,7 @@ app.get('/sitemap.xml', (req, res) => {
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => `  <url><loc>${esc(u.loc)}</loc><lastmod>${hoje}</lastmod><changefreq>${u.freq}</changefreq><priority>${u.pri}</priority></url>`).join('\n')}
+${urls.map(u => `  <url><loc>${esc(u.loc)}</loc>${u.mod === null ? '' : `<lastmod>${u.mod || hoje}</lastmod>`}<changefreq>${u.freq}</changefreq><priority>${u.pri}</priority></url>`).join('\n')}
 </urlset>
 `);
 });
@@ -354,12 +360,31 @@ app.get('/ajuda', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ajuda.html')
 app.get('/loja/:slug', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'loja.html')));
 app.get('/anuncio/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'anuncio.html')));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));
+// Página 404: a mesma tela das ofertas (quem errou o endereço continua achando o que procura), lida do index.html a
+// cada mudança do arquivo
+let cache404 = { mtime: 0, html: '' };
+function paginaNaoEncontrada() {
+  const arq = path.join(PUBLIC_DIR, 'index.html');
+  const mtime = fs.statSync(arq).mtimeMs;
+  if (mtime !== cache404.mtime) {
+    const html = fs.readFileSync(arq, 'utf8')
+      .replace(/<title>[^<]*<\/title>/, '<title>Página não encontrada — Ofertou!</title>')
+      .replace(/<link rel="canonical"[^>]*>\s*/, '')
+      .replace(/<meta name="robots"[^>]*>\s*/g, '')
+      .replace('<head>', '<head>\n<meta name="robots" content="noindex">');
+    cache404 = { mtime, html };
+  }
+  return cache404.html;
+}
 app.get('*', (req, res) => {
   // Arquivos (com extensão) e caminhos ocultos (.env, .git...) inexistentes respondem 404.
   if (path.extname(req.path) || /\/\./.test(req.path)) return res.status(404).send('Não encontrado');
   if (!access.canSeeOffers(req)) return res.redirect('/conta');
-  // Endereço que não existe: mostra as ofertas, mas responde 404 (com 200 o Google trata como página duplicada)
-  res.status(req.path === '/' ? 200 : 404).sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  // Endereço que não existe: mostra as ofertas, mas responde 404 (com 200 o Google trata como página duplicada),
+  // com título próprio e marcado para não indexar (a home tem canonical e "index"; a 404 não pode parecer a home)
+  if (req.path === '/') return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  res.status(404).type('html').setHeader('Cache-Control', 'no-cache');
+  res.send(paginaNaoEncontrada());
 });
 
 app.use((err, req, res, next) => {

@@ -42,7 +42,7 @@ function pagina() {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ferramenta para afiliados: ofertas prontas e postagem automática | Ofertou!</title>
 <meta name="description" content="Ofertas mineradas, cupons, postagem automática no WhatsApp e Telegram, comissão e membros no mesmo painel, com os seus links de afiliado.">
-<link rel="canonical" href="/ferramenta">
+<link rel="canonical" href="https://tanoofertou.com.br/ferramenta">
 <meta name="theme-color" content="#0a7a43">
 <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
