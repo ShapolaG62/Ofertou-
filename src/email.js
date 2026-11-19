@@ -10,10 +10,9 @@ function configurado(s = settings.getAll()) {
 // Identificação de quem mantém o site, no fim de todo e-mail (Decreto 7.962/2013)
 function rodapeLegal(s) {
   if (!s.legal_nome) return '';
-  const doc = String(s.legal_documento || '').replace(/\D/g, '');
-  const docTxt = doc.length === 11 ? `CPF ${doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}`
-    : doc.length === 14 ? `CNPJ ${doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}` : '';
-  return [`Ofertou! — mantido por ${s.legal_nome}`, docTxt, s.legal_endereco, s.legal_email].filter(Boolean).join(' · ');
+  // Mesma versão do site: CPF mascarado e só cidade/UF para pessoa física (settings.identificacaoPublica)
+  const id = settings.identificacaoPublica(s);
+  return [`Ofertou! — mantido por ${s.legal_nome}`, id.documento, id.endereco, s.legal_email].filter(Boolean).join(' · ');
 }
 const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

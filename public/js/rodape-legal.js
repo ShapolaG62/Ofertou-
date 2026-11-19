@@ -29,12 +29,8 @@
     a.addEventListener('click', e => { e.preventDefault(); main.focus(); main.scrollIntoView(); });
     document.body.prepend(a);
   }
-  function formatarDoc(d) {
-    const n = String(d || '').replace(/\D/g, '');
-    if (n.length === 11) return `CPF ${n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}`;
-    if (n.length === 14) return `CNPJ ${n.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}`;
-    return d ? String(d) : '';
-  }
+  // O servidor já manda o documento pronto para exibir (CPF mascarado ou CNPJ formatado: settings.identificacaoPublica)
+  const formatarDoc = d => (d ? String(d) : '');
   async function montar() {
     let s = {};
     try { s = await fetch('/api/settings/public').then(r => r.json()); } catch { /* sem conexão: só o tema */ }

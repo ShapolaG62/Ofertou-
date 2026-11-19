@@ -259,9 +259,32 @@ function set(key, value) {
   );
 }
 
+// Identificação de quem mantém o site, como pode sair em público (site, rodapé, e-mails).
+// Pessoa física (CPF): o número sai mascarado como nos documentos do governo (***.456.789-**) e o endereço só com
+// cidade/UF; o endereço completo é informado pelo e-mail de contato, a quem pedir. CNPJ é dado de empresa: sai inteiro,
+// com o endereço completo. Assim a internet não recebe CPF e endereço residencial de ninguém.
+function identificacaoPublica(s = getAll()) {
+  const n = String(s.legal_documento || '').replace(/\D/g, '');
+  const endereco = String(s.legal_endereco || '').trim();
+  if (n.length === 14) {
+    return { documento: `CNPJ ${n.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}`, endereco, pessoaFisica: false };
+  }
+  if (n.length === 11) {
+    const m = endereco.match(/([A-Za-zÀ-ÿ' .]+?)\s*[/-]\s*([A-Za-z]{2})\s*\.?\s*$/);
+    const cidade = m ? `${m[1].trim().split(/,\s*/).pop()}/${m[2].toUpperCase()}` : '';
+    return { documento: `CPF ***.${n.slice(3, 6)}.${n.slice(6, 9)}-**`, endereco: cidade, pessoaFisica: true };
+  }
+  return { documento: '', endereco: '', pessoaFisica: false }; // número incompleto ou inválido: não mostra nada
+}
+
 function getPublic() {
   const s = getAll();
-  return Object.fromEntries(PUBLIC_KEYS.map(k => [k, s[k] || '']));
+  const pub = Object.fromEntries(PUBLIC_KEYS.map(k => [k, s[k] || '']));
+  const id = identificacaoPublica(s);
+  pub.legal_documento = id.documento;
+  pub.legal_endereco = id.endereco;
+  pub.legal_pessoa_fisica = id.pessoaFisica ? '1' : ''; // texto, para a página de privacidade mostrar/esconder o aviso
+  return pub;
 }
 
 // Visão para o painel: segredos aparecem apenas como "configurado/não configurado".
@@ -311,6 +334,6 @@ function getSearchTerms() {
 }
 
 module.exports = {
-  DEFAULTS, getAll, get, set, getPublic, getForAdmin, updateFromAdmin,
+  DEFAULTS, getAll, get, set, getPublic, identificacaoPublica, getForAdmin, updateFromAdmin,
   getNumber, getEnabledStores, getSearchTerms,
 };
